@@ -745,6 +745,12 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
 /* with the work question gone, experience takes the whole row */
 .frow > #workAsBox.hide ~ .ff{grid-column:1 / -1;}
 .frow > #workAsBox.hide ~ .ff .seg{max-width:430px;}
+
+/* the word beside the stars, so nobody wonders which end is good */
+.rword{margin:2px 0 12px;font-family:var(--f-m);font-size:11.5px;color:var(--faint);
+  letter-spacing:.03em;}
+.rword.picked{font-family:var(--f-b);font-size:14px;font-weight:600;color:#0B6F5C;
+  letter-spacing:0;}
 </style>
 
 <!-- ══════════════ INTRO + FORM ══════════════ -->
@@ -925,6 +931,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
     <h3 id="rateTitle">How was this report?</h3>
     <p class="ms">One tap. It tells us what to improve.</p>
     <div class="stars" id="stars"></div>
+    <p class="rword" id="rateWord">1 = poor &nbsp;·&nbsp; 5 = excellent</p>
     <label class="mlab" for="rcomment" id="msgLabel">Any message you want to send to the planner?</label>
     <textarea id="rcomment" rows="3" placeholder="Optional"></textarea>
     <button class="btn pdf full" id="saveBtn" onclick="finishAndPrint()" disabled>Save as PDF</button>
@@ -1460,7 +1467,7 @@ function renderReport(o){
       '<div class="ctaline">'+
         '<div class="ct"><h3>Want a personalised, detailed plan?</h3>'+
         '<p>'+PLANNER.split(' ')[0]+' builds the whole picture with you &mdash; setting goals that are actually reachable, a budget that holds, a plan to clear your loans, the right cover, where to invest, and the retirement most people leave until it is too late.</p></div>'+
-        '<a class="btn wa" href="https://wa.me/'+WHATSAPP+'?text='+encodeURIComponent('Hi, I just did the one page financial plan and I’d like a detailed plan.')+'" target="_blank" rel="noopener">Connect with '+PLANNER.split(' ')[0]+'</a>'+
+        '<a class="btn wa" href="https://wa.me/'+WHATSAPP+'?text='+encodeURIComponent('Hi '+PLANNER.split(' ')[0]+', this is '+(o.name||'someone')+(o.company? ' from '+o.company : '')+'. I just did the One Page Financial Plan and I’d like a detailed plan.')+'" target="_blank" rel="noopener">Connect with '+PLANNER.split(' ')[0]+'</a>'+
       '</div>'+
       '<button class="btn pdf" onclick="askRating()">Save this report as PDF</button>'+
       '<p class="printonly">Want a detailed plan? Message <b>'+PLANNER+'</b> on WhatsApp &mdash; +977 9849849876</p>'+
@@ -1992,6 +1999,7 @@ function backToForm(){
 
 /* ═══════════ rating + save ═══════════ */
 var RATING=0, PLAN=null;
+var RATE_WORDS=['','Poor','Fair','Good','Very good','Excellent'];
 function askRating(){
   document.getElementById('rateModal').classList.add('on');
   var host=document.getElementById('stars'); if(host.childElementCount) return;
@@ -2000,6 +2008,8 @@ function askRating(){
     b.setAttribute('aria-label',n+' star'+(n>1?'s':''));
     b.onclick=function(){ RATING=n;
       [].forEach.call(host.children,function(c,ix){c.classList.toggle('lit',ix<n);});
+      var w=document.getElementById('rateWord');
+      if(w){ w.textContent=RATE_WORDS[n]; w.classList.add('picked'); }
       document.getElementById('saveBtn').disabled=false;
       document.getElementById('rateHint').classList.add('hide'); };
     host.appendChild(b);})(i);
