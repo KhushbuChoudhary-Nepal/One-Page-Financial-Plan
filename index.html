@@ -1,4 +1,17 @@
+<!--
+  One Page Financial Plan — Jugnu (See Beyond)
+  Copyright (c) 2026 Khushbu Choudhary, Financial Planner, Nepal.
+  All rights reserved.
+
+  This page, its wording, layout and calculation logic are the original work
+  of Khushbu Choudhary. You are welcome to use the tool and share the link.
+  You may not copy, republish, rebrand or redistribute this code, in whole or
+  in part, without written permission.
+  Contact: +977 9849849876
+-->
 <meta charset="utf-8">
+<meta name="author" content="Khushbu Choudhary">
+<meta name="copyright" content="© 2026 Khushbu Choudhary. All rights reserved.">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>One Page Financial Plan &mdash; Jugnu</title>
 <meta name="description" content="The first step — see what your money has to do, and what it takes. A free one page financial plan by Khushbu Choudhary, Financial Planner, Nepal.">
@@ -809,6 +822,20 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
   .gitem.yearly .gy-w,.gitem.yearly .gd{display:none;}
 }
 @media(min-width:641px){ .glab{display:none;} }
+.fcopy{display:inline-block;margin-top:6px;font-family:var(--f-m);font-size:10.5px;letter-spacing:.02em;color:var(--faint);opacity:.85;}
+
+/* thank-you state inside the rating sheet */
+#thanksStep.hide{display:none;}
+.sheet2 .tick{width:36px;height:36px;border-radius:50%;background:var(--green-t);color:var(--green);
+  display:flex;align-items:center;justify-content:center;font-size:19px;margin:0 0 11px;}
+.sheet2 .tx{font-size:13px;color:var(--ink-2);line-height:1.6;margin:0 0 2px;}
+.btn.lin{display:block;width:100%;box-sizing:border-box;text-align:center;background:#0A66C2;
+  color:#fff;border:none;border-radius:9px;font-family:var(--f-b);font-size:14px;font-weight:700;
+  padding:13px 12px;margin-top:13px;text-decoration:none;cursor:pointer;}
+.btn.lin:hover{filter:brightness(1.08);}
+.thxClose{display:block;width:100%;margin:9px 0 0;background:none;border:none;cursor:pointer;
+  font-family:var(--f-b);font-size:11.5px;color:var(--faint);}
+.thxClose:hover{color:var(--mute);}
 </style>
 
 <!-- ══════════════ INTRO + FORM ══════════════ -->
@@ -986,7 +1013,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
       <button type="button" class="snext" id="sNext">Next</button>
     </div>
     <button class="fgo" id="fgo">Show me my plan</button>
-    <p class="ffoot">Your plan is worked out inside your own browser, and your answers stay on this device so you do not have to type them again. Only your rating and your message reach Khushbu.<br>This is financial education, not personal investment advice.</p>
+    <p class="ffoot">Your plan is worked out inside your own browser, and your answers stay on this device so you do not have to type them again. Only your rating and your message reach Khushbu.<br>This is financial education, not personal investment advice.<br><span class="fcopy">&copy; 2026 Khushbu Choudhary. All rights reserved.</span></p>
   </div>
 </div>
 
@@ -994,14 +1021,24 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
 
 <div class="modal" id="rateModal" role="dialog" aria-modal="true" aria-labelledby="rateTitle">
   <div class="sheet2">
-    <h3 id="rateTitle">How was this report?</h3>
-    <p class="ms">One tap. It tells us what to improve.</p>
-    <div class="stars" id="stars"></div>
-    <p class="rword" id="rateWord">1 = poor &nbsp;·&nbsp; 5 = excellent</p>
-    <label class="mlab" for="rcomment" id="msgLabel">Any message you want to send to the planner?</label>
-    <textarea id="rcomment" rows="3" placeholder="Optional"></textarea>
-    <button class="btn pdf full" id="saveBtn" onclick="finishAndPrint()" disabled>Save as PDF</button>
-    <p class="mhint" id="rateHint">Please tap a star first.</p>
+    <div id="rateStep">
+      <h3 id="rateTitle">How was this report?</h3>
+      <p class="ms">One tap. Your feedback helps us improve.</p>
+      <div class="stars" id="stars"></div>
+      <p class="rword" id="rateWord">1 = poor &nbsp;·&nbsp; 5 = excellent</p>
+      <label class="mlab" for="rcomment" id="msgLabel">Any message you want to send to the planner?</label>
+      <textarea id="rcomment" rows="3" placeholder="Type here"></textarea>
+      <button class="btn pdf full" id="saveBtn" onclick="finishAndPrint()" disabled>Save as PDF</button>
+      <p class="mhint" id="rateHint">Please tap a star first.</p>
+    </div>
+    <div id="thanksStep" class="hide">
+      <div class="tick">&#10003;</div>
+      <h3>Thank you.</h3>
+      <p class="ms">Your plan is saved.</p>
+      <p class="tx" id="thxLine">For more on financial planning, connect with the planner on LinkedIn.</p>
+      <a class="btn lin" id="thxLi" href="https://www.linkedin.com/in/khushbuchoudhary" target="_blank" rel="noopener">Connect on LinkedIn</a>
+      <button type="button" class="thxClose" onclick="closeThanks()">Close</button>
+    </div>
   </div>
 </div>
 
@@ -1538,7 +1575,7 @@ function renderReport(o){
       '<button class="btn pdf" onclick="askRating()">Save this report as PDF</button>'+
       '<p class="printonly">Want a detailed plan? Message <b>'+PLANNER+'</b> on WhatsApp &mdash; +977 9849849876</p>'+
     '</div>'+
-    '<p class="fine2">The data presented are based on certain assumptions, and assume your existing assets are available for these goals. Returns are illustrative, never guaranteed. This is financial education, not personal investment advice, and not a recommendation of any product or policy.</p>'+
+    '<p class="fine2">The data presented are based on certain assumptions, and assume your existing assets are available for these goals. Returns are illustrative, never guaranteed. This is financial education, not personal investment advice, and not a recommendation of any product or policy. &nbsp;&copy; 2026 '+PLANNER+'. All rights reserved.</p>'+
     '</div>'+
     '<div class="endbar">jugnu &nbsp;&mdash;&nbsp; <span>SEE BEYOND</span></div>'+
   '</div>';
@@ -2141,15 +2178,25 @@ function askRating(){
       [].forEach.call(host.children,function(c,ix){c.classList.toggle('lit',ix<n);});
       var w=document.getElementById('rateWord');
       if(w){ w.textContent=RATE_WORDS[n]; w.classList.add('picked'); }
+      askByRating(n);
       document.getElementById('saveBtn').disabled=false;
       document.getElementById('rateHint').classList.add('hide'); };
     host.appendChild(b);})(i);
 }
+function askByRating(n){
+  var l=document.getElementById('msgLabel'); if(!l) return;
+  l.textContent = n>=4 ? 'What did you find most useful?'
+                       : 'Is there anything you did not understand?';
+}
 function finishAndPrint(){
   if(!RATING) return;
   sendFeedback({rating:RATING, comment:(document.getElementById('rcomment')||{}).value||''});
-  document.getElementById('rateModal').classList.remove('on');
+  document.getElementById('rateStep').classList.add('hide');
+  document.getElementById('thanksStep').classList.remove('hide');
   setTimeout(function(){window.print();},220);
+}
+function closeThanks(){
+  document.getElementById('rateModal').classList.remove('on');
 }
 function sendFeedback(p){
   if(!FEEDBACK_URL) return;
@@ -2249,6 +2296,10 @@ function startFresh(){
   document.getElementById('f_country').addEventListener('change',setCurrency);
   document.getElementById('fplName').textContent=PLANNER;
   document.getElementById('msgLabel').textContent='Any message you want to send to '+PLANNER.split(' ')[0]+'?';
+  document.getElementById('rcomment').setAttribute('placeholder',
+    'Type here — '+PLANNER.split(' ')[0]+' reads all messages.');
+  document.getElementById('thxLine').textContent =
+    'For more on financial planning, connect with '+PLANNER.split(' ')[0]+' on LinkedIn.';
   document.getElementById('fgo').addEventListener('click',submitForm);
   document.getElementById('sNext').addEventListener('click',nextStep);
   document.getElementById('sBack').addEventListener('click',function(){ goStep(STEP-1); });
