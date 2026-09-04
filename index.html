@@ -33,6 +33,7 @@
   --amber:#B8862B; --amber-t:#F8F0DE;
   --red:#C0392B;  --red-t:#FAEAE7;
   --violet:#0E8C74; --violet-t:#E2F2EE;
+  --sel-fg:#0A4F3F; --sel-bd:#0B6F5C;
   --f-d:'Sora',system-ui,sans-serif;
   --f-b:'IBM Plex Sans',system-ui,sans-serif;
   --f-m:'IBM Plex Mono',ui-monospace,monospace;
@@ -47,6 +48,7 @@
   --amber:#B5872F; --amber-t:#26200F;
   --red:#D5695C;  --red-t:#2A1815;
   --violet:#22A88F; --violet-t:#0C2621;
+  --sel-fg:#8CE8D0; --sel-bd:#22A88F;
 }}
 :root[data-theme="dark"]{
   --navy:#0C1F3C; --navy-2:#0A5A4B; --navy-3:#7E5C1B;
@@ -58,6 +60,7 @@
   --amber:#B5872F; --amber-t:#26200F;
   --red:#D5695C;  --red-t:#2A1815;
   --violet:#22A88F; --violet-t:#0C2621;
+  --sel-fg:#8CE8D0; --sel-bd:#22A88F;
 }
 
 *{box-sizing:border-box;}
@@ -299,8 +302,8 @@ body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f-b);fo
 .seg button{flex:1;min-width:88px;padding:10px 10px;border:1px solid var(--rule);background:var(--card);
   border-radius:8px;font-family:var(--f-b);font-size:13.5px;color:var(--ink-2);cursor:pointer;transition:all .12s;}
 .seg button:hover{border-color:var(--mute);}
-.seg button.on{background:var(--green-t);border-color:#0B6F5C;color:#0A4F3F;font-weight:600;
-  box-shadow:inset 0 0 0 1px #0B6F5C;}
+.seg button.on{background:var(--green-t);border-color:var(--sel-bd);color:var(--sel-fg);font-weight:600;
+  box-shadow:inset 0 0 0 1px var(--sel-bd);}
 
 .ghead{display:grid;grid-template-columns:1fr 92px 130px;gap:9px;padding-bottom:7px;
   font-family:var(--f-m);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);}
@@ -364,8 +367,8 @@ body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f-b);fo
 .gitem .freq button{border:1px solid var(--rule);background:var(--card);border-radius:99px;
   padding:3px 11px;font-family:var(--f-b);font-size:10.5px;color:var(--mute);cursor:pointer;
   line-height:1.5;white-space:nowrap;}
-.gitem .freq button.on{background:var(--green-t);border-color:#0B6F5C;color:#0A4F3F;font-weight:600;
-  box-shadow:inset 0 0 0 1px #0B6F5C;}
+.gitem .freq button.on{background:var(--green-t);border-color:var(--sel-bd);color:var(--sel-fg);font-weight:600;
+  box-shadow:inset 0 0 0 1px var(--sel-bd);}
 .span2{grid-column:2 / 3;display:flex;align-items:center;gap:8px;flex-wrap:wrap;
   margin-top:2px;margin-bottom:2px;font-size:11.5px;color:var(--mute);font-family:var(--f-m);}
 .span2 .range{display:flex;align-items:center;gap:5px;}
@@ -751,6 +754,61 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
   letter-spacing:.03em;}
 .rword.picked{font-family:var(--f-b);font-size:14px;font-weight:600;color:#0B6F5C;
   letter-spacing:0;}
+
+/* every box in the form follows the theme, not the browser default */
+.fcard input,.fcard select,.fcard textarea{background:var(--card);color:var(--ink);
+  border:1px solid var(--rule);border-radius:8px;font-family:var(--f-b);}
+.fcard .gd input{background:var(--rule-2);}
+
+/* ── stepped form: phones and tablets only ── */
+.stepbar{margin:0 0 16px;}
+.steptop{display:flex;align-items:baseline;justify-content:space-between;margin:0 0 7px;}
+.steptop b{font-family:var(--f-m);font-size:11px;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--green);font-weight:600;}
+.steptop span{font-family:var(--f-h);font-size:14px;font-weight:600;color:var(--ink);}
+.stepnav{display:flex;gap:12px;margin:6px 0 0;}
+.stepnav button{flex:1;border-radius:10px;padding:14px 12px;font-family:var(--f-b);
+  font-size:15px;font-weight:600;cursor:pointer;border:1px solid var(--rule);}
+.sback{background:var(--card);color:var(--ink-2);flex:0 0 34%;}
+.sback:hover{border-color:var(--mute);}
+.snext{background:#0B6F5C;border-color:#0B6F5C;color:#fff;}
+.snext:hover{filter:brightness(1.06);}
+
+/* ── phone and tablet layout ── */
+@media(max-width:640px){
+  /* short answers pair up */
+  .frow.trio{grid-template-columns:1fr 90px;margin-bottom:14px;}
+  .seg button{min-width:62px;}
+  .frow.trio > .ff > span{white-space:nowrap;font-size:12.5px;}
+  .frow.trio > .ff:nth-child(1){grid-column:1 / -1;}
+  .frow.trio > .ff:nth-child(2){grid-column:1;}
+  .frow.trio > #kidsBox{grid-column:2;}
+  .fcard .frow.pairNA{display:grid;grid-template-columns:1fr 86px;gap:10px;}
+  .fcard .frow.pairCC{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+
+  /* a goal: name on top, then cost, year and duration across */
+  .gitem{grid-template-columns:1fr;row-gap:0;padding:11px 4px;}
+  .gitem{position:relative;padding-left:2px;}
+  .gitem .lead{display:none;}
+  .gitem.on .lead{display:inline-flex;position:absolute;left:0;top:12px;}
+  .gitem .gname{grid-column:1;padding-right:24px;}
+  .gitem.on .gname{padding-left:26px;}
+  .gitem .grm{position:absolute;right:0;top:9px;}
+  .gtrio{display:grid;grid-template-columns:1fr 74px 52px;gap:6px;margin-top:8px;}
+  .gitem .gc-w,.gitem .gy-w,.gitem .gd{grid-column:auto;}
+  .gitem .gc{padding-right:44px;}
+  .gitem .gvh{right:7px;font-size:9px;top:auto;bottom:9px;transform:none;}
+  .glab{display:block;font-family:var(--f-m);font-size:9px;letter-spacing:.05em;
+    text-transform:uppercase;color:var(--faint);margin:0 0 3px;}
+  .gitem select,.gitem .gd input{font-size:12.5px;padding:8px 3px;}
+  .span2{grid-column:1;margin-top:9px;}
+  .span2 select{min-width:0;flex:1;}
+  .span2 .range{flex:1 1 100%;display:grid;grid-template-columns:34px 1fr;gap:6px 8px;align-items:center;}
+  .span2 .range select{width:100%;}
+  .gitem.yearly .gtrio{grid-template-columns:1fr;}
+  .gitem.yearly .gy-w,.gitem.yearly .gd{display:none;}
+}
+@media(min-width:641px){ .glab{display:none;} }
 </style>
 
 <!-- ══════════════ INTRO + FORM ══════════════ -->
@@ -768,7 +826,11 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
   </div>
 
   <div class="fwrap">
-    <div class="fprog"><i id="fprogBar"></i></div>
+    <div class="stepbar hide" id="stepBar">
+      <div class="steptop"><b id="stepNow">Step 1 of 4</b><span id="stepName">About you</span></div>
+      <div class="fprog"><i id="fprogBar"></i></div>
+    </div>
+    <div class="fprog" id="plainProg"><i id="plainProgBar"></i></div>
     <div class="refbar hide" id="refBar"><span>Reference</span><b id="refBarName"></b></div>
     <div class="restored hide" id="restoredBar">
       <span>Your last answers have been filled in for you.</span>
@@ -781,11 +843,11 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
       <div class="fbody">
         <h2>About you</h2>
         <p class="fsub">Just the basics, so the plan fits your life and not an average one.</p>
-        <div class="frow">
+        <div class="frow pairNA">
           <label class="ff"><span>Your name</span><input id="f_name" type="text" autocomplete="name"></label>
           <label class="ff sm"><span>Age</span><input id="f_age" type="number" inputmode="numeric" min="15" max="65"></label>
         </div>
-        <div class="frow">
+        <div class="frow pairCC">
           <label class="ff"><span>You live in</span>
             <select id="f_country">
               <option value="NP" selected>Nepal</option>
@@ -919,6 +981,10 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
     </section>
 
     <div class="ferr" id="ferr"></div>
+    <div class="stepnav hide" id="stepNav">
+      <button type="button" class="sback" id="sBack">Back</button>
+      <button type="button" class="snext" id="sNext">Next</button>
+    </div>
     <button class="fgo" id="fgo">Show me my plan</button>
     <p class="ffoot">Your plan is worked out inside your own browser, and your answers stay on this device so you do not have to type them again. Only your rating and your message reach Khushbu.<br>This is financial education, not personal investment advice.</p>
   </div>
@@ -1651,7 +1717,7 @@ function refreshHints(){
 var YR0=new Date().getFullYear();
 var RET_MIN=40, RET_MAX=65;
 function yearOpts(lo,hi,extra){
-  var h='<option value="">&mdash;</option>';
+  var h='<option value="">Select</option>';
   if(extra) h+='<option value="life">Throughout life</option>';
   for(var y=lo;y<=hi;y++) h+='<option value="'+y+'">'+y+'</option>';
   return h;
@@ -1664,12 +1730,12 @@ function yearSel(g){
     hi=YR0+Math.max(1,RET_MAX-age);
     if(hi<lo) hi=lo;
   }
-  return '<span class="gy-w"><select class="gy">'+yearOpts(lo,hi)+'</select>'+
+  return '<span class="gy-w"><i class="glab">By when</i><select class="gy">'+yearOpts(lo,hi)+'</select>'+
          '<b class="gspan"></b></span>';
 }
 function costCell(){
-  return '<span class="gc-w"><input type="number" inputmode="numeric" min="0" class="gc">'+
-         '<i class="gvh"></i></span>';
+  return '<span class="gc-w"><i class="glab">Cost (NPR)</i>'+
+         '<input type="number" inputmode="numeric" min="0" class="gc"><i class="gvh"></i></span>';
 }
 function paintCost(d){
   var i=d.querySelector('.gc'), h=d.querySelector('.gvh');
@@ -1831,8 +1897,9 @@ function rowShell(name,g,own){
     '<span class="gname">'+(own?'<input type="text" class="gn" maxlength="22" placeholder="Name your goal">':name)+
       (g&&g.d?'<em class="gdesc">'+g.d+'</em>':'')+
       (g&&g.retire?'<em class="atage"></em>':'')+'</span>'+
-    costCell()+yearSel(g)+
-    '<span class="gd"><input type="text" readonly tabindex="-1" value="—"></span>'+
+    '<span class="gtrio">'+costCell()+yearSel(g)+
+      '<span class="gd"><i class="glab">Years</i><input type="text" readonly tabindex="-1" value="—"></span>'+
+    '</span>'+
     '<span class="grm"><button type="button" class="rmv" title="Clear this goal">&times;</button></span>'+
     optsRow(g&&g.freq);
 }
@@ -1887,13 +1954,64 @@ function setCurrency(){
   var os = document.getElementById('f_country').value==='OS';
   document.getElementById('cityLab').textContent = os ? 'Country' : 'City';
 }
+/* ── one section at a time on phones and tablets ── */
+var STEPPED=false, STEP=1;
+var STEP_NAMES=['About you','Your cashflow','What you have','What you want'];
+function stepQuery(){ return window.matchMedia('(max-width:1024px)').matches; }
+
+function cards(){ return [].slice.call(document.querySelectorAll('#formView .fcard')); }
+
+function paintStep(){
+  var c=cards();
+  c.forEach(function(el,i){ el.classList.toggle('hide', STEPPED && (i+1)!==STEP); });
+  var bar=document.getElementById('stepBar'), nav=document.getElementById('stepNav'),
+      plain=document.getElementById('plainProg'), go=document.getElementById('fgo');
+  bar.classList.toggle('hide',!STEPPED);
+  nav.classList.toggle('hide',!STEPPED);
+  plain.classList.toggle('hide',STEPPED);
+  if(STEPPED){
+    document.getElementById('stepNow').textContent='Step '+STEP+' of 4';
+    document.getElementById('stepName').textContent=STEP_NAMES[STEP-1];
+    document.getElementById('fprogBar').style.width=Math.round(STEP/4*100)+'%';
+    document.getElementById('sBack').classList.toggle('hide', STEP===1);
+    document.getElementById('sNext').classList.toggle('hide', STEP===4);
+    go.classList.toggle('hide', STEP!==4);
+  } else { go.classList.remove('hide'); }
+}
+function goStep(n){
+  STEP=Math.max(1,Math.min(4,n));
+  paintStep();
+  var top=document.querySelector('.fwrap');
+  window.scrollTo({top:Math.max(0,top.offsetTop-70),behavior:'auto'});
+}
+function nextStep(){
+  clearBad();
+  var chk=checkForm(STEP);
+  if(chk.miss.length){
+    var e=document.getElementById('ferr');
+    e.textContent='Please complete the boxes marked in red before moving on.';
+    e.classList.add('on');
+    if(chk.first){ chk.first.scrollIntoView({behavior:'smooth',block:'center'});
+      if(chk.first.tagName==='INPUT') setTimeout(function(){chk.first.focus();},350); }
+    return;
+  }
+  goStep(STEP+1);
+}
+function syncStepMode(){
+  var want=stepQuery();
+  if(want===STEPPED) return;
+  STEPPED=want;
+  if(!STEPPED) cards().forEach(function(el){ el.classList.remove('hide'); });
+  paintStep();
+}
+
 function progress(){
   var have=0;
   if((document.getElementById('f_name').value||'').trim()) have++;
   if((document.getElementById('f_age').value||'').trim()) have++;
   if(val('f_income')>0&&val('f_spend')>0) have++;
   if(pickedGoals().length) have++;
-  document.getElementById('fprogBar').style.width=Math.round(have/4*100)+'%';
+  document.getElementById('plainProgBar').style.width=Math.round(have/4*100)+'%';
 }
 function readForm(){
   return {
@@ -1926,18 +2044,24 @@ function markBad(el){
   if(el.tagName==='INPUT'||el.tagName==='SELECT')
     el.addEventListener('input',function(){el.classList.remove('bad');},{once:true});
 }
-function checkForm(){
+function checkForm(only){
   var miss=[], firstEl=null;
   function need(id,cond){
     var el=document.getElementById(id);
     if(cond){ markBad(el); miss.push(id); if(!firstEl) firstEl=el; }
   }
-  need('f_name', !(document.getElementById('f_name').value||'').trim());
-  var age=+document.getElementById('f_age').value;
-  need('f_age', !(age>=15&&age<=65));
-  need('f_city', !(document.getElementById('f_city').value||'').trim());
-  need('f_income', !(val('f_income')>0));
-  need('f_spend',  !(val('f_spend')>0));
+  var wants=function(n){ return !only || only===n; };
+  if(wants(1)){
+    need('f_name', !(document.getElementById('f_name').value||'').trim());
+    var age=+document.getElementById('f_age').value;
+    need('f_age', !(age>=15&&age<=65));
+    need('f_city', !(document.getElementById('f_city').value||'').trim());
+  }
+  if(wants(2)){
+    need('f_income', !(val('f_income')>0));
+    need('f_spend',  !(val('f_spend')>0));
+  }
+  if(!wants(4)) return {miss:miss, first:firstEl};
 
   /* a row with a cost but no year, or the other way round, is half an answer */
   var half=false;
@@ -1980,7 +2104,14 @@ function closeNeed(){
 function submitForm(){
   clearBad();
   var chk=checkForm();
-  if(chk.miss.length){ showNeed(); return false; }
+  if(chk.miss.length){
+    if(STEPPED && chk.first){
+      var card=chk.first.closest ? chk.first.closest('.fcard') : null;
+      var ix=card ? cards().indexOf(card)+1 : 4;
+      if(ix && ix!==STEP){ goStep(ix); }
+    }
+    showNeed(); return false;
+  }
   var d=readForm();
   var o=computePlan(d); PLAN=o;
   document.getElementById('reportView').innerHTML=
@@ -2119,6 +2250,10 @@ function startFresh(){
   document.getElementById('fplName').textContent=PLANNER;
   document.getElementById('msgLabel').textContent='Any message you want to send to '+PLANNER.split(' ')[0]+'?';
   document.getElementById('fgo').addEventListener('click',submitForm);
+  document.getElementById('sNext').addEventListener('click',nextStep);
+  document.getElementById('sBack').addEventListener('click',function(){ goStep(STEP-1); });
+  syncStepMode();
+  window.matchMedia('(max-width:1024px)').addEventListener('change',syncStepMode);
   ['f_income','f_otherinc','f_spend','f_emi'].forEach(function(id){
     document.getElementById(id).addEventListener('input',function(){savingLine();progress();});});
   document.getElementById('f_name').addEventListener('input',progress);
