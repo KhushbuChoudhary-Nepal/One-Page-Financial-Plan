@@ -821,7 +821,10 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
   .gitem.yearly .gtrio{grid-template-columns:1fr;}
   .gitem.yearly .gy-w,.gitem.yearly .gd{display:none;}
 }
-@media(min-width:641px){ .glab{display:none;} }
+/* On laptops the three boxes must sit in the row's own columns, not stack inside
+   one cell. display:contents dissolves the mobile wrapper so its children join
+   the .gitem grid directly. */
+@media(min-width:641px){ .glab{display:none;} .gtrio{display:contents;} }
 .fcopy{display:inline-block;margin-top:6px;font-family:var(--f-m);font-size:10.5px;letter-spacing:.02em;color:var(--faint);opacity:.85;}
 
 /* thank-you state inside the rating sheet */
