@@ -228,6 +228,23 @@ body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f-b);fo
 .fine2{padding:0 0 10px;font-size:10px;line-height:1.5;color:var(--faint);}
 
 @media print{
+  /* The PDF is a document, not a screen. Whatever the reader's device is set to,
+     printing always uses the light palette — a dark PDF is unreadable if the
+     browser leaves "background graphics" off, and unprintable if it does not. */
+  /* the :root:root:root repetition outranks the dark-mode block above, which uses
+     :root:not([data-theme="light"]) — a plain :root here would lose to it */
+  :root:root:root,:root:root:root[data-theme="dark"]{
+    --navy:#14274A; --navy-2:#0B6F5C; --navy-3:#9C7222;
+    --paper:#EFF2F6; --card:#FFFFFF;
+    --ink:#14274A; --ink-2:#3A4E66; --mute:#66788E; --faint:#95A5B8;
+    --rule:#DBE1E9; --rule-2:#EFF2F6;
+    --blue:#14274A; --blue-t:#EDF1F6;
+    --green:#0E8C74; --green-t:#E2F2EE;
+    --amber:#B8862B; --amber-t:#F8F0DE;
+    --red:#C0392B;  --red-t:#FAEAE7;
+    --violet:#0E8C74; --violet-t:#E2F2EE;
+    --sel-fg:#0A4F3F; --sel-bd:#0B6F5C;
+  }
   @page{size:A4;margin:6mm;}
   html,body{background:#fff;font-size:8.4pt;}
   .doc{max-width:none;border:none;}
@@ -374,7 +391,7 @@ body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f-b);fo
 .gitem .grm{display:flex;justify-content:flex-end;}
 .gitem .rmv{visibility:hidden;background:none;border:none;color:var(--faint);font-size:17px;
   line-height:1;cursor:pointer;padding:0;width:22px;height:22px;border-radius:5px;}
-.gitem.has .rmv{visibility:visible;}
+.gitem.has .rmv,.gitem.touched .rmv{visibility:visible;}
 .gitem .rmv:hover{color:var(--red);background:var(--red-t);}
 .gitem .freq{display:flex;gap:5px;width:fit-content;}
 .gitem .freq button{border:1px solid var(--rule);background:var(--card);border-radius:99px;
@@ -1048,7 +1065,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
 <div class="modal" id="needModal" role="dialog" aria-modal="true" aria-labelledby="needTitle">
   <div class="sheet2">
     <h3 id="needTitle">Almost there</h3>
-    <p class="ms">Fill in the boxes <b>marked in red</b>. You need at least <b>three goals</b>, and the retirement fund is required.</p>
+    <p class="ms" id="needMsg">Fill in the boxes <b>marked in red</b>.</p>
     <button class="goback" onclick="closeNeed()">Show me</button>
   </div>
 </div>
@@ -1867,6 +1884,13 @@ function renumber(keep){
     if(done){ n++; lead.innerHTML='<span class="gnum">'+n+'</span>'; }
     else lead.innerHTML='';
     r.classList.toggle('has', done || r.dataset.own==='1' || !!(+r.querySelector('.gc').value));
+    /* The x must appear the moment a row is touched at all — picking only a year
+       used to leave no way back, and the form then blocked on a half-filled row
+       the person could not clear. */
+    var gy=r.querySelector('.gy'), gf=r.querySelector('.gfrom'), gt=r.querySelector('.gto');
+    var touched = !!(+r.querySelector('.gc').value) || !!(gy&&gy.value)
+      || !!(gf&&gf.value) || !!(gt&&gt.value) || r.classList.contains('yearly');
+    r.classList.toggle('touched', done || r.dataset.own==='1' || touched);
   });
   var c=document.getElementById('goalCount');
   if(c) c.textContent = n===0 ? '' : (n===1?'\u2014 1 goal':'\u2014 '+n+' goals');
@@ -2134,7 +2158,25 @@ function checkForm(only){
   }
   return {miss:miss, first:firstEl};
 }
-function showNeed(){ document.getElementById('needModal').classList.add('on'); }
+/* Say only what is actually wrong. Reciting all three rules every time sent people
+   hunting for a missing goal when the real problem was one empty box. */
+function showNeed(miss){
+  miss = miss || [];
+  var has=function(k){ return miss.indexOf(k)>=0; };
+  var lines=[];
+  if(has('half-filled goals'))
+    lines.push('A goal is missing a box &mdash; the cost or the year. Fill in what is <b>marked in red</b>, or press the <b>&times;</b> to drop that goal.');
+  if(has('retirement'))
+    lines.push('The <b>retirement fund</b> needs a cost and a year.');
+  if(has('three goals'))
+    lines.push('Please pick at least <b>three goals</b> in all.');
+  if(!lines.length) lines.push('Fill in the boxes <b>marked in red</b>.');
+  var t=document.getElementById('needTitle');
+  if(t) t.textContent = lines.length===1 && has('half-filled goals') ? 'One box left' : 'Almost there';
+  var m=document.getElementById('needMsg');
+  if(m) m.innerHTML=lines.join(' ');
+  document.getElementById('needModal').classList.add('on');
+}
 function closeNeed(){
   document.getElementById('needModal').classList.remove('on');
   var el=document.querySelector('.bad');
@@ -2150,7 +2192,7 @@ function submitForm(){
       var ix=card ? cards().indexOf(card)+1 : 4;
       if(ix && ix!==STEP){ goStep(ix); }
     }
-    showNeed(); return false;
+    showNeed(chk.miss); return false;
   }
   var d=readForm();
   var o=computePlan(d); PLAN=o;
