@@ -869,7 +869,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
       </div>
       <div class="fpl"><div class="k">PLANNER</div><div class="v" id="fplName">Khushbu Choudhary</div></div>
     </div>
-    <div class="fpills"><span>2 min</span><span>Free plan</span><span>Save as PDF</span></div>
+    <div class="fpills"><span>10 min</span><span>Personal Report</span><span>Save as PDF</span></div>
   </div>
 
   <div class="fwrap">
@@ -1593,7 +1593,12 @@ function renderReport(o){
         '<a class="btn wa" href="https://wa.me/'+WHATSAPP+'?text='+encodeURIComponent('Hi '+PLANNER.split(' ')[0]+', this is '+(o.name||'someone')+(o.company? ' from '+o.company : '')+'. I just did the One Page Financial Plan and I’d like a detailed plan.')+'" target="_blank" rel="noopener">Connect with '+PLANNER.split(' ')[0]+'</a>'+
       '</div>'+
       '<button class="btn pdf" onclick="askRating()">Save this report as PDF</button>'+
-      '<p class="printonly">Want a detailed plan? Message <b>'+PLANNER+'</b> on WhatsApp &mdash; +977 9849849876</p>'+
+      /* This line only ever prints. It is read by the person who made the plan and,
+         when the PDF travels into a company proposal, by whoever reviews it there —
+         so it offers help rather than asking for business. */
+      '<p class="printonly">A detailed financial plan is available on request.<br>'+
+        '<b>'+PLANNER+'</b> &mdash; WhatsApp +977 9849849876 &nbsp;&middot;&nbsp; '+
+        'Email khushbuchoudhary06@gmail.com</p>'+
     '</div>'+
     '<p class="fine2">The data presented are based on certain assumptions, and assume your existing assets are available for these goals. Returns are illustrative, never guaranteed. This is financial education, not personal investment advice, and not a recommendation of any product or policy. &nbsp;&copy; 2026 '+PLANNER+'. All rights reserved.</p>'+
     '</div>'+
