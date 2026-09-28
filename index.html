@@ -870,8 +870,9 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
 #retQ{margin-bottom:16px;}
 #retModal .skip{font-size:13.5px;}
 .gt tr.gtot td.all{white-space:normal;}
-.retnote.altnote{border-top:none;padding-top:0;margin-top:6px;}
-.gt tr.gtot td.all .nx{display:block;color:var(--green);}
+.retlist .altline{display:block;margin-top:6px;}
+@media print{ .retlist .altline{margin-top:4pt;} }
+.gt tr.gtot td.nx{color:var(--green);font-family:var(--f-d);white-space:nowrap;}
 .needbul{margin:4px 0 0;padding-left:18px;}
 .needbul li{margin:0 0 7px;line-height:1.45;}
 .needbul li b{color:var(--ink);}
@@ -1525,15 +1526,20 @@ function renderReport(o){
   });
   if(goalRows) goalRows += o.needMo>0
     ? '<tr class="gtot"><td colspan="2">Required investments each month</td><td class="r n">'+compact(o.needMo)+'</td></tr>'
-    : '<tr class="gtot"><td colspan="3" class="all">Required investments each month <span class="nx">Nothing extra needed</span></td></tr>';
+    : '<tr class="gtot"><td colspan="2">Required investments each month</td><td class="r nx">Not needed</td></tr>';
   else goalRows='<tr><td colspan="3" class="empty">No goals added &mdash; go back and fill in what matters to you.</td></tr>';
 
   var gapNote='';
   if(o.goals.length){
+    var short = !!(o.ret && o.ret.short), noSave = o.save<=0;
     gapNote = o.needMo<=0
-      ? '<p class="retnote">Your existing assets already cover every goal above. '+
-        'A monthly investment from your '+(o.haveMo>0 ? '<b>'+compact(o.haveMo)+'</b> ' : '')+'savings protects you from rising prices, '+
-        'maintains your standard of living, and gives you a financially stress-free life.</p>'
+      ? '<p class="retnote">'+
+        (short ? 'Your existing assets cover every goal above at the amounts you have entered.'
+               : noSave ? 'Your existing assets cover every goal above.'
+               : 'Your existing assets already cover every goal above. A monthly investment from your <b>'+compact(o.haveMo)+
+                 '</b> savings protects you from rising prices, maintains your standard of living, and gives you a financially stress-free life.')+
+        (noSave ? '<span class="opt"> Right now expenses are more than monthly income &mdash; bringing that into balance is the first step.</span>' : '')+
+        '</p>'
       : '<p class="retnote">'+
       (o.assetsUsed>0 ? 'Assets worth <b>'+compact(o.assetsUsed)+'</b> can be utilised to fund these goals. ' : '')+
       (o.covered
@@ -1543,9 +1549,6 @@ function renderReport(o){
           : 'Monthly savings of <b>'+compact(o.haveMo)+'</b> leave a gap of <b>'+compact(o.gapMo)+
             '</b>. Start with what you can and raise it as your income grows.')+
       '</p>';
-    if(o.alt) gapNote+='<p class="retnote altnote">Your retirement estimate is <b>'+compact(o.alt.put)+
-      '</b>. If you plan for <b>'+compact(o.alt.fig)+'</b> instead, the required investment becomes about <b>'+
-      compact(o.alt.needMo)+'</b> a month.</p>';
   }
 
   var retNote='';
@@ -1555,7 +1558,9 @@ function renderReport(o){
       'You have estimated <b>'+compact(o.ret.put)+'</b> for retirement &mdash; '+
       (o.ret.short
         ? 'with rising costs and longer lives it might fall short. For a stress-free retirement, aim for '+
-          'a corpus of <b>'+corpusTxt(o.ret.corpus)+'</b>. Also, do a periodic review to check the same number still holds.'
+          'a corpus of <b>'+corpusTxt(o.ret.corpus)+'</b>. Also, do a periodic review to check the same number still holds.'+
+          (o.alt ? '<span class="altline">If you plan for <b>'+compact(o.alt.fig)+'</b> instead of <b>'+compact(o.alt.put)+
+            '</b>, the required investment becomes about <b>'+compact(o.alt.needMo)+'</b> a month.</span>' : '')
         : o.ret.near
         ? 'that is nearly there. It will likely meet the need, with not much to spare. '+
           'Do a periodic review to check the same number still holds.'
@@ -1793,9 +1798,11 @@ function drawCharts(o){
     svg.appendChild(el('path',{d:path(o.step)+'L'+X(N)+' '+Y(0)+'L'+X(0)+' '+Y(0)+'Z',fill:AMBER,'fill-opacity':.12}));
     svg.appendChild(el('path',{d:path(o.flat),fill:'none',stroke:GREEN,'stroke-width':2}));
     svg.appendChild(el('path',{d:path(o.step),fill:'none',stroke:AMBER,'stroke-width':2}));
-    [[o.step[N],AMBER],[o.flat[N],GREEN]].forEach(function(c){
+    var yS=Y(o.step[N]), yF=Y(o.flat[N]);
+    if(yF-yS<13){ var mid=(yS+yF)/2; yS=mid-6.5; yF=mid+6.5; }        /* keep the two labels apart */
+    [[o.step[N],AMBER,yS],[o.flat[N],GREEN,yF]].forEach(function(c){
       svg.appendChild(el('circle',{cx:X(N),cy:Y(c[0]),r:3.5,fill:c[1],stroke:CARD,'stroke-width':1.5}));
-      tx(svg,X(N)+7,Y(c[0])+4,money(c[0]),{fill:c[1],'font-size':11,'font-weight':700,'font-family':MONO}); });
+      tx(svg,X(N)+7,c[2]+4,money(c[0]),{fill:c[1],'font-size':11,'font-weight':700,'font-family':MONO}); });
     marks.forEach(function(m){
       svg.appendChild(el('line',{x1:X(m),x2:X(m),y1:T,y2:T+ph,stroke:RULE,'stroke-width':1,'stroke-dasharray':'2 3'}));
       svg.appendChild(el('circle',{cx:X(m),cy:Y(o.step[m]),r:2.6,fill:AMBER}));
@@ -2297,6 +2304,7 @@ function nextStep(){
     return;
   }
   if(STEP===1 && needsExpConfirm()){ askExp(nextStep); return; }
+  if(STEP===2 && needsSpendConfirm()){ askSpend(nextStep); return; }
   goStep(STEP+1);
 }
 /* computers: check this section, then open the next one */
@@ -2314,6 +2322,20 @@ function expStart(){
   var a=+(document.getElementById('f_age').value||0), x=+(document.getElementById('f_exp').value||0);
   return a-x;
 }
+/* spending above income is asked once, when section 2 is finished */
+var SPEND_OK='';
+function spendKey(){ return [val('f_income'),val('f_otherinc'),val('f_spend'),val('f_emi')].join('|'); }
+function needsSpendConfirm(){
+  var inc=val('f_income')+val('f_otherinc'), out=val('f_spend')+val('f_emi');
+  return inc>0 && out>inc && SPEND_OK!==spendKey();
+}
+function askSpend(then){
+  EXP_THEN=then;
+  var gap=(val('f_spend')+val('f_emi'))-(val('f_income')+val('f_otherinc'));
+  document.getElementById('expQ').textContent='You spend '+compact(gap)+' more than you earn each month \u2014 is that right?';
+  document.getElementById('expModal').dataset.kind='spend';
+  document.getElementById('expModal').classList.add('on');
+}
 function needsExpConfirm(){
   var a=(document.getElementById('f_age').value||'').trim(), x=(document.getElementById('f_exp').value||'').trim();
   if(!a || !x) return false;
@@ -2322,9 +2344,15 @@ function needsExpConfirm(){
 function askExp(then){
   EXP_THEN=then;
   document.getElementById('expQ').textContent='You started working at '+expStart()+' \u2014 is that right?';
+  document.getElementById('expModal').dataset.kind='exp';
   document.getElementById('expModal').classList.add('on');
 }
 function expYes(){
+  if(document.getElementById('expModal').dataset.kind==='spend'){
+    SPEND_OK=spendKey();
+    document.getElementById('expModal').classList.remove('on');
+    var t0=EXP_THEN; EXP_THEN=null; if(t0) t0(); return;
+  }
   EXP_OK=(document.getElementById('f_age').value||'').trim()+'|'+(document.getElementById('f_exp').value||'').trim();
   document.getElementById('expModal').classList.remove('on');
   var t=EXP_THEN; EXP_THEN=null; if(t) t();
@@ -2332,6 +2360,12 @@ function expYes(){
 function expChange(){
   EXP_THEN=null;
   document.getElementById('expModal').classList.remove('on');
+  if(document.getElementById('expModal').dataset.kind==='spend'){
+    if(STEPPED && STEP!==2) goStep(2);
+    var sp=document.getElementById('f_spend');
+    sp.scrollIntoView({behavior:'smooth',block:'center'}); setTimeout(function(){ sp.focus(); sp.select(); },350);
+    return;
+  }
   if(STEPPED && STEP!==1) goStep(1);
   var e=document.getElementById('f_exp');
   e.scrollIntoView({behavior:'smooth',block:'center'}); setTimeout(function(){ e.focus(); e.select(); },350);
@@ -2348,6 +2382,7 @@ function contStep(n){
     return;
   }
   if(n===1 && needsExpConfirm()){ askExp(function(){ contStep(1); }); return; }
+  if(n===2 && needsSpendConfirm()){ askSpend(function(){ contStep(2); }); return; }
   REVEAL=Math.max(REVEAL,n+1); STEP=Math.max(STEP,n+1);
   paintStep();
   var next=cards()[n];
@@ -2415,7 +2450,7 @@ function checkForm(only){
     /* experience: required, and no more than age minus 15 */
     var ev=(document.getElementById('f_exp').value||'').trim(), ex=+ev;
     var tooMuch = ev!=='' && age>=15 && age<=65 && ex>age;
-    need('f_exp', ev==='' || !(ex>=0) || ex>50 || tooMuch);
+    need('f_exp', ev==='' || !(ex>=0) || tooMuch);
     if(tooMuch) miss.push('exp too high');
     need('f_kids', segVal('s_kids')==='yes' && !(+document.getElementById('f_kids').value>=1));
     need('f_othername', multiVal('s_dep').indexOf('others')>=0 && !(document.getElementById('f_othername').value||'').trim());
@@ -2517,6 +2552,7 @@ function submitForm(){
     showNeed(chk.miss); return false;
   }
   if(needsExpConfirm()){ askExp(submitForm); return false; }
+  if(needsSpendConfirm()){ askSpend(submitForm); return false; }
   var d=readForm();
   var o=computePlan(d); PLAN=o;
   document.getElementById('reportView').innerHTML=
