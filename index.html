@@ -864,6 +864,13 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
 .ffoot .fl{display:block;text-wrap:balance;}
 #expQ{margin-bottom:16px;}
 #expModal .skip{font-size:13.5px;}
+.gitem .gname .atage{display:inline-block;margin-top:4px;padding:1px 8px;border-radius:99px;
+  background:var(--green-t);color:#0B6F5C;font-weight:700;font-size:11px;}
+.gitem .gname .atage:empty{display:none;}
+#retQ{margin-bottom:16px;}
+#retModal .skip{font-size:13.5px;}
+.gt tr.gtot td.all{white-space:normal;}
+.gt tr.gtot td.all .nx{display:block;color:var(--green);}
 .needbul{margin:4px 0 0;padding-left:18px;}
 .needbul li{margin:0 0 7px;line-height:1.45;}
 .needbul li b{color:var(--ink);}
@@ -1109,6 +1116,13 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
     <h3 id="expQ">You started working at 15 &mdash; is that right?</h3>
     <button class="goback" onclick="expYes()">Yes, that&rsquo;s right</button>
     <button class="skip" onclick="expChange()">Change it</button>
+  </div>
+</div>
+<div class="modal" id="retModal" role="dialog" aria-modal="true" aria-labelledby="retQ">
+  <div class="sheet2">
+    <h3 id="retQ">You want to retire at 62 &mdash; is that right?</h3>
+    <button class="goback" onclick="retYes()">Yes, that&rsquo;s right</button>
+    <button class="skip" onclick="retChange()">Change it</button>
   </div>
 </div>
 <div class="modal" id="needModal" role="dialog" aria-modal="true" aria-labelledby="needTitle">
@@ -1497,13 +1511,18 @@ function renderReport(o){
                 '</td><td class="c y">'+g.year+
                 '</td><td class="r n">'+compact(g.yearly?g.fund:g.total)+'</td></tr>'; });
   });
-  if(goalRows) goalRows+='<tr class="gtot"><td colspan="2">Required investments each month</td>'+
-    '<td class="r n">'+compact(o.needMo)+'</td></tr>';
+  if(goalRows) goalRows += o.needMo>0
+    ? '<tr class="gtot"><td colspan="2">Required investments each month</td><td class="r n">'+compact(o.needMo)+'</td></tr>'
+    : '<tr class="gtot"><td colspan="3" class="all">Required investments each month <span class="nx">Nothing extra needed</span></td></tr>';
   else goalRows='<tr><td colspan="3" class="empty">No goals added &mdash; go back and fill in what matters to you.</td></tr>';
 
   var gapNote='';
   if(o.goals.length){
-    gapNote='<p class="retnote">'+
+    gapNote = o.needMo<=0
+      ? '<p class="retnote">Your existing assets already cover every goal above. '+
+        'A monthly investment from your '+(o.haveMo>0 ? '<b>'+compact(o.haveMo)+'</b> ' : '')+'savings protects you from rising prices, '+
+        'maintains your standard of living, and gives you a financially stress-free life.</p>'
+      : '<p class="retnote">'+
       (o.assetsUsed>0 ? 'Assets worth <b>'+compact(o.assetsUsed)+'</b> can be utilised to fund these goals. ' : '')+
       (o.covered
         ? 'Monthly savings of <b>'+compact(o.haveMo)+'</b> will cover the rest.'
@@ -1669,6 +1688,7 @@ function renderReport(o){
         '<div class="wc">'+ladder(o)+
         '<h4>You see the whole picture</h4>'+
         '<p>'+(!o.goals.length ? 'Every goal, every rupee and every year in one view.'
+             : o.goalsDone>=o.goals.length ? 'All <b>'+o.goals.length+'</b> goal'+(o.goals.length>1?'s are':' is')+' already covered by what you own.'
              : o.goalsDone>0 ? '<b>'+o.goalsDone+' of '+o.goals.length+'</b> goal'+(o.goals.length>1?'s are':' is')+
                                ' already covered by what you own. The rest need <b>'+compact(o.needMo)+' a month</b>.'
              : 'Every goal in one view, and one number to act on: <b>'+compact(o.needMo)+' a month</b>.')+'</p></div>'+
@@ -1809,7 +1829,7 @@ function bindSegs(){
     var h=document.getElementById(id); if(!h) return;
     h.addEventListener('click',function(e){
       var b=e.target.closest('button'); if(!b) return;
-      seg(id,b.dataset.v);
+      seg(id,b.dataset.v); h.classList.remove('bad');
       if(id==='s_hasloan')  syncLoan();
       if(id==='s_kids'){ document.getElementById('kidsBox').classList.toggle('hide',b.dataset.v!=='yes');
                          spendHintText(); }
@@ -2089,7 +2109,8 @@ function bindRow(d){
   ['.gy','.gfrom','.gto'].forEach(function(sel){
     var e=d.querySelector(sel); if(e) e.addEventListener('change',function(){
       if(sel==='.gfrom') syncTo(d);
-      paintDur(d); paintRow(d); renumber(d); progress(); });
+      paintDur(d); paintRow(d); renumber(d); progress();
+      if(sel==='.gy' && d.dataset.name==='Retirement Fund') checkRetAge(d); });
   });
   syncTo(d);
   var rm=d.querySelector('.rmv');
@@ -2102,6 +2123,26 @@ function bindRow(d){
   paintDur(d); paintCost(d);
   d.addEventListener('focusout',function(){
     setTimeout(function(){ if(!d.contains(document.activeElement)) flagRow(d); },0); });
+}
+/* retiring after 60 is asked once, the moment the year is chosen */
+var RET_ROW=null;
+function checkRetAge(d){
+  var y=+d.querySelector('.gy').value||0, a=+(document.getElementById('f_age').value||0);
+  if(!y || !a) return;
+  var at=a+(y-YR0);
+  if(at<=60) return;
+  RET_ROW=d;
+  document.getElementById('retQ').textContent='You want to retire at '+at+' \u2014 is that right?';
+  document.getElementById('retModal').classList.add('on');
+}
+function retYes(){ RET_ROW=null; document.getElementById('retModal').classList.remove('on'); }
+function retChange(){
+  var d=RET_ROW; RET_ROW=null;
+  document.getElementById('retModal').classList.remove('on');
+  if(!d) return;
+  var g=d.querySelector('.gy'); g.value='';
+  paintDur(d); paintRow(d); renumber(d); progress(); saveState();
+  setTimeout(function(){ g.focus(); },50);
 }
 function who(){
   return { married: segVal('s_marital')==='married',
@@ -2232,9 +2273,7 @@ function nextStep(){
   var chk=checkForm(STEP);
   if(chk.miss.length){
     var e=document.getElementById('ferr');
-    e.textContent = chk.miss.indexOf('exp too high')>=0
-      ? expLimitMsg()
-      : 'Please complete the boxes marked in red before moving on.';
+    e.textContent = stepMsg(chk.miss);
     e.classList.add('on');
     if(chk.first){ chk.first.scrollIntoView({behavior:'smooth',block:'center'});
       if(chk.first.tagName==='INPUT') setTimeout(function(){chk.first.focus();},350); }
@@ -2244,6 +2283,13 @@ function nextStep(){
   goStep(STEP+1);
 }
 /* computers: check this section, then open the next one */
+function emiMsg(){ return 'You pay an EMI of '+exact(val('f_emi'))+' \u2014 is there a loan outstanding?'; }
+/* the red note under Continue / Next says what is wrong */
+function stepMsg(miss){
+  if(miss.indexOf('exp too high')>=0) return expLimitMsg();
+  if(miss.indexOf('emi no loan')>=0) return emiMsg();
+  return 'Please complete the boxes marked in red before moving on.';
+}
 function expLimitMsg(){ return 'Work experience can\u2019t be more than your age.'; }
 /* an early start (before 15) is asked once, when section 1 is finished */
 var EXP_OK='', EXP_THEN=null;
@@ -2278,9 +2324,7 @@ function contStep(n){
   var chk=checkForm(n);
   if(chk.miss.length){
     var e=document.getElementById('ferr');
-    e.textContent = chk.miss.indexOf('exp too high')>=0
-      ? expLimitMsg()
-      : 'Please complete the boxes marked in red before moving on.';
+    e.textContent = stepMsg(chk.miss);
     e.classList.add('on');
     if(chk.first){ chk.first.scrollIntoView({behavior:'smooth',block:'center'});
       if(chk.first.tagName==='INPUT') setTimeout(function(){chk.first.focus();},350); }
@@ -2356,6 +2400,7 @@ function checkForm(only){
     var tooMuch = ev!=='' && age>=15 && age<=65 && ex>age;
     need('f_exp', ev==='' || !(ex>=0) || ex>50 || tooMuch);
     if(tooMuch) miss.push('exp too high');
+    need('f_kids', segVal('s_kids')==='yes' && !(+document.getElementById('f_kids').value>=1));
     need('f_othername', multiVal('s_dep').indexOf('others')>=0 && !(document.getElementById('f_othername').value||'').trim());
   }
   if(wants(2)){
@@ -2364,6 +2409,11 @@ function checkForm(only){
   }
   if(wants(3)){
     need('f_loanbal', segVal('s_hasloan')==='yes' && !(val('f_loanbal')>0));
+    /* an EMI means a loan is outstanding */
+    if(val('f_emi')>0 && segVal('s_hasloan')!=='yes'){
+      var hl=document.getElementById('s_hasloan'); hl.classList.add('bad');
+      miss.push('emi no loan'); if(!firstEl) firstEl=hl;
+    }
     /* a loan needs its EMI — 0 is an answer, an empty box is not */
     need('f_emi2', segVal('s_hasloan')==='yes' && (document.getElementById('f_emi').value||'').trim()==='');
   }
@@ -2416,6 +2466,8 @@ function showNeed(miss){
     lines.push('<b>A goal is missing its cost or year.</b> Fill it in, or press <b>&times;</b> to remove that goal.');
   if(has('retirement'))
     lines.push('<b>Retirement Fund</b> needs a cost and a year.');
+  if(has('emi no loan'))
+    lines.push('<b>Loan:</b> '+emiMsg());
   if(has('too many goals'))
     lines.push('<b>Keep it to '+MAXGOALS+' goals.</b> Press <b>&times;</b> on any goal to remove it.');
   if(has('three goals'))
@@ -2485,7 +2537,8 @@ function askRating(){
 function askByRating(n){
   var l=document.getElementById('msgLabel'); if(!l) return;
   l.textContent = n>=4 ? 'What did you find most useful?'
-                       : 'Is there anything you did not understand?';
+              : n===3 ? 'What would make it better?'
+                      : 'Is there anything you did not understand?';
 }
 function finishAndPrint(){
   if(!RATING) return;
