@@ -870,6 +870,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
 #retQ{margin-bottom:16px;}
 #retModal .skip{font-size:13.5px;}
 .gt tr.gtot td.all{white-space:normal;}
+.retnote.altnote{border-top:none;padding-top:0;margin-top:6px;}
 .gt tr.gtot td.all .nx{display:block;color:var(--green);}
 .needbul{margin:4px 0 0;padding-left:18px;}
 .needbul li{margin:0 0 7px;line-height:1.45;}
@@ -1222,7 +1223,7 @@ function stepFV(start,r,y,st){ var v=0,m=start;
 function bandOf(years){ return years<=3?'short':years<=7?'medium':'long'; }
 
 /* ═══════════ the engine ═══════════ */
-function computePlan(d){
+function computePlan(d,alt){
   var o={};
   function cap(t){ return String(t||'').trim().replace(/\s+/g,' ')
       .replace(/(^|[\s\-'])([a-z])/g,function(m,a,b){return a+b.toUpperCase();}); }
@@ -1302,6 +1303,8 @@ function computePlan(d){
   /* goals, grouped by horizon, costs exactly as entered */
   var yr=new Date().getFullYear();
   o.goals=(d.goals||[]).filter(function(g){return g.name && +g.cost>0 && +g.year>yr;})
+    /* for the comparison line only: the retirement goal at our figure */
+    .map(function(g){ return (alt && g.name==='Retirement Fund') ? Object.assign({},g,{cost:alt}) : g; })
     .map(function(g){ var yearly=g.freq==='year';
       var span  = yearly ? Math.max(1, +g.span || (+g.year-(+g.from||yr)+1)) : 1;
       var start = yearly ? Math.max(yr+1, +g.from||yr+1) : +g.year;
@@ -1424,6 +1427,15 @@ function computePlan(d){
   o.raise=0.15; o.ladder=[];
   for(var k=0;k<5;k++) o.ladder.push(Math.round(o.income*Math.pow(1+o.raise,k)/500)*500);
 
+  /* for knowledge only: the monthly figure if retirement were planned at our
+     estimate. The plan itself stays on the client's own number. */
+  o.alt=null;
+  if(!alt && o.ret && o.ret.short){
+    var fig = o.ret.corpus<50000000 ? o.ret.corpus : Math.round(o.ret.corpus/10000000)*10000000;
+    var other = computePlan(d, fig);
+    /* shown only when it makes a real difference: at least 5,000 more a month */
+    if(other.needMo - o.needMo >= 5000) o.alt={ put:o.ret.put, fig:fig, needMo:other.needMo };
+  }
   return o;
 }
 
@@ -1531,6 +1543,9 @@ function renderReport(o){
           : 'Monthly savings of <b>'+compact(o.haveMo)+'</b> leave a gap of <b>'+compact(o.gapMo)+
             '</b>. Start with what you can and raise it as your income grows.')+
       '</p>';
+    if(o.alt) gapNote+='<p class="retnote altnote">Your retirement estimate is <b>'+compact(o.alt.put)+
+      '</b>. If you plan for <b>'+compact(o.alt.fig)+'</b> instead, the required investment becomes about <b>'+
+      compact(o.alt.needMo)+'</b> a month.</p>';
   }
 
   var retNote='';
