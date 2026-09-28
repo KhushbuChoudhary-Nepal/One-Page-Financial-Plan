@@ -1618,7 +1618,9 @@ function renderReport(o){
       '<span><i style="background:#E8A81C"></i>Years it pays you</span></div></div>'+
       '<div class="cb"><div class="txt">You have <b>'+left+' working year'+(left>1?'s':'')+
       '</b> before you retire at '+o.retAge+'. After that, the salary stops and your spending does not. '+
-      'Use these years to build assets that pay you a regular income.</div></div>'+
+      (left<=5
+        ? 'Use '+(left>1?'these years':'this year')+' to <b>clear any loans and rearrange your investments to give you a regular income</b>, so that you live a stress-free retirement.'
+        : 'Use these years to build assets that pay you a regular income.')+'</div></div>'+
     '</div>';
   }
 
