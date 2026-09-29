@@ -357,7 +357,7 @@ body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f-b);fo
 .backbar{max-width:840px;margin:0 auto 10px;padding:14px 4px 0;}
 .backbar button{background:none;border:none;font-family:var(--f-b);font-size:13.5px;color:var(--mute);
   cursor:pointer;text-decoration:underline;padding:0;}
-@media print{.backbar{display:none!important;}}
+@media print{.backbar,#presView,#gateBox{display:none!important;}}
 
 /* goal picker — a quiet table, filled goals numbered and lifted to the top */
 .gcols{grid-template-columns:24px minmax(0,1fr) 150px 92px 76px 26px;
@@ -874,6 +874,42 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
 @media print{ .retlist .altline{margin-top:4pt;} }
 .gt tr.gtot td.nx{color:var(--green);font-family:var(--f-d);white-space:nowrap;}
 .needbul{margin:4px 0 0;padding-left:18px;}
+/* ── session lock: what the audience sees when the form is not open ── */
+.gatecard{background:var(--card);border:1px solid var(--rule);border-radius:12px;padding:26px 24px;margin-top:22px;text-align:center;}
+.gatecard h2{font-family:var(--f-d);font-size:20px;margin:0 0 8px;color:var(--ink);}
+.gatecard p{margin:0 0 6px;font-size:14px;line-height:1.55;color:var(--ink-2);}
+.gatecard .gbtns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:14px;}
+.gatecard .spin{width:26px;height:26px;border-radius:50%;border:3px solid var(--rule);border-top-color:#0B6F5C;
+  margin:4px auto 12px;animation:spin .9s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+/* ── presenter screen ── */
+.pv-wrap{max-width:760px;margin:0 auto;padding:0 16px 60px;}
+.pv-card{background:var(--card);border:1px solid var(--rule);border-radius:12px;padding:20px 22px;margin-top:18px;}
+.pv-card h2{font-family:var(--f-d);font-size:18px;margin:0 0 12px;color:var(--ink);}
+.pv-card label{display:block;font-size:13px;font-weight:600;color:var(--ink-2);margin:0 0 6px;}
+.pv-card input{width:100%;max-width:360px;padding:11px 12px;border:1px solid var(--rule);border-radius:8px;
+  font-family:var(--f-b);font-size:15px;color:var(--ink);background:var(--card);}
+.pv-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+.pv-btn{border:none;border-radius:9px;padding:12px 22px;font-family:var(--f-b);font-weight:700;font-size:14.5px;cursor:pointer;
+  background:#0B6F5C;color:#fff;}
+.pv-btn.stop{background:var(--red);}
+.pv-btn.lite{background:var(--rule-2);color:var(--ink);}
+.pv-btn[disabled]{opacity:.5;cursor:default;}
+.pv-msg{margin:10px 0 0;font-size:13px;color:var(--red);}
+.pv-state{display:inline-flex;align-items:center;gap:8px;font-family:var(--f-d);font-weight:700;font-size:16px;}
+.pv-state i{width:11px;height:11px;border-radius:50%;background:var(--faint);display:inline-block;}
+.pv-state.on i{background:#16A34A;box-shadow:0 0 0 4px rgba(22,163,74,.18);}
+.pv-facts{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:14px 0 0;font-size:13.5px;color:var(--ink-2);}
+.pv-facts b{color:var(--ink);font-weight:600;}
+.pv-count{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px;}
+.pv-count div{background:var(--rule-2);border-radius:10px;padding:14px 16px;}
+.pv-count span{display:block;font-family:var(--f-m);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);}
+.pv-count b{display:block;font-family:var(--f-d);font-size:34px;color:var(--ink);line-height:1.1;margin-top:4px;}
+.pv-link{display:flex;gap:18px;align-items:center;flex-wrap:wrap;}
+.pv-link code{display:block;font-family:var(--f-m);font-size:13px;background:var(--rule-2);padding:10px 12px;border-radius:8px;
+  word-break:break-all;color:var(--ink);}
+#pvQR{background:#fff;padding:10px;border-radius:10px;border:1px solid var(--rule);}
+.pv-note{font-size:12px;color:var(--mute);margin:10px 0 0;}
 .needbul li{margin:0 0 7px;line-height:1.45;}
 .needbul li b{color:var(--ink);}
 /* section C: every card is title / picture / text, and cards side by side share
@@ -919,7 +955,8 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
     <div class="fpills"><span>10 min</span><span>Personal Report</span><span>Save as PDF</span></div>
   </div>
 
-  <div class="fwrap">
+  <div class="fwrap hide" id="gateBox"><div class="gatecard" id="gateCard"></div></div>
+  <div class="fwrap" id="formBody">
     <div class="stepbar hide" id="stepBar">
       <div class="steptop"><b id="stepNow">Step 1 of 4</b><span id="stepName">About you</span></div>
       <div class="fprog"><i id="fprogBar"></i></div>
@@ -1088,6 +1125,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
   </div>
 </div>
 
+<div id="presView" class="hide"></div>
 <div id="reportView" class="hide"></div>
 
 <div class="modal" id="rateModal" role="dialog" aria-modal="true" aria-labelledby="rateTitle">
@@ -2553,6 +2591,23 @@ function submitForm(){
   }
   if(needsExpConfirm()){ askExp(submitForm); return false; }
   if(needsSpendConfirm()){ askSpend(submitForm); return false; }
+  /* the session is checked again at the last moment — a closed session stops here */
+  var go=document.getElementById('fgo'), was=go.textContent;
+  go.disabled=true; go.textContent='Checking\u2026';
+  sessionCall({act:'status'}).then(function(st){
+    go.disabled=false; go.textContent=was;
+    if(!st.open || !SESSION || st.sid!==SESSION.sid){ SESSION=null; gate('closed'); return; }
+    renderPlan();
+    sessionCall({act:'report', sid:SESSION.sid, dev:deviceId()}).catch(function(){});
+  }).catch(function(){
+    go.disabled=false; go.textContent=was;
+    document.getElementById('needTitle').textContent='No connection';
+    document.getElementById('needMsg').innerHTML='We could not reach the server. Check your internet and press <b>Show me my plan</b> again.';
+    document.getElementById('needModal').classList.add('on');
+  });
+  return false;
+}
+function renderPlan(){
   var d=readForm();
   var o=computePlan(d); PLAN=o;
   document.getElementById('reportView').innerHTML=
@@ -2610,10 +2665,144 @@ function sendFeedback(p){
           + '&location='+ encodeURIComponent(PLAN? (PLAN.place||'') : '')
           + '&ref='     + encodeURIComponent(REFCO || '')
           + '&rating='  + encodeURIComponent(p.rating||'')
-          + '&message=' + encodeURIComponent((p.comment||'').slice(0,900));
+          + '&message=' + encodeURIComponent((p.comment||'').slice(0,900))
+          + '&ws='      + encodeURIComponent(SESSION ? SESSION.name : '');
     var img = new Image();
     img.src = FEEDBACK_URL + q;      /* a plain GET — no CORS, and it cannot fail loudly */
   }catch(e){}
+}
+
+/* ═══════════ workshop sessions ═══════════ */
+/* The form opens only while Khushbu has a session open on the presenter screen
+   (this page + #present). The open/closed state and the planner code live in
+   the Google Apps Script, never in this page. */
+var SESSION=null, PCODE='', PV_TIMER=null;
+function sessionCall(params){
+  var q=Object.keys(params).map(function(k){ return encodeURIComponent(k)+'='+encodeURIComponent(params[k]); }).join('&');
+  var ctl = window.AbortController ? new AbortController() : null;
+  var t = ctl ? setTimeout(function(){ ctl.abort(); },15000) : null;
+  return fetch(FEEDBACK_URL+'?'+q, ctl?{signal:ctl.signal}:{}).then(function(r){
+    if(t) clearTimeout(t);
+    return r.json(); });
+}
+/* a random number that stays on this phone or computer — used only to count devices */
+function deviceId(){
+  var k='jugnu.device', v='';
+  try{ v=localStorage.getItem(k)||''; }catch(e){}
+  if(!v){ v='d'+Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4);
+    try{ localStorage.setItem(k,v); }catch(e){} }
+  return v;
+}
+function gate(kind){
+  var box=document.getElementById('gateBox'), card=document.getElementById('gateCard'),
+      form=document.getElementById('formBody');
+  document.getElementById('reportView').classList.add('hide');
+  document.getElementById('formView').classList.remove('hide');
+  if(kind==='open'){ box.classList.add('hide'); form.classList.remove('hide'); return; }
+  form.classList.add('hide'); box.classList.remove('hide');
+  var first=PLANNER.split(' ')[0];
+  card.innerHTML = kind==='checking'
+    ? '<div class="spin"></div><p>Opening the form\u2026</p>'
+    : kind==='offline'
+    ? '<h2>We could not connect</h2><p>Check your internet and try again.</p>'+
+      '<div class="gbtns"><button class="pv-btn" onclick="audienceStart()">Try again</button></div>'
+    : '<h2>This session is closed</h2><p>For a financial plan, contact <b>'+PLANNER+'</b>.</p>'+
+      '<div class="gbtns"><a class="btn wa" href="https://wa.me/'+WHATSAPP+'" target="_blank" rel="noopener">WhatsApp '+first+'</a>'+
+      '<a class="pv-btn lite" style="text-decoration:none" href="mailto:khushbuchoudhary06@gmail.com">Email '+first+'</a></div>';
+  window.scrollTo(0,0);
+}
+function audienceStart(){
+  gate('checking');
+  sessionCall({act:'status'}).then(function(st){
+    if(st.open){ SESSION={sid:st.sid, name:st.name}; gate('open'); }
+    else { SESSION=null; gate('closed'); }
+  }).catch(function(){ gate('offline'); });
+}
+
+/* ---- presenter screen ---- */
+function pvTime(ms){ if(!ms) return '\u2014';
+  return new Date(ms).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}); }
+function audienceLink(){ return location.origin+location.pathname; }
+function presenterStart(){
+  document.getElementById('formView').classList.add('hide');
+  document.getElementById('reportView').classList.add('hide');
+  var v=document.getElementById('presView'); v.classList.remove('hide');
+  v.innerHTML='<div class="fhero"><div class="fbar"><div class="flogo"><img src="'+LOGO+'" alt="Jugnu \u2014 See Beyond"></div>'+
+    '<div class="ftitle"><h1>One Page Financial Plan</h1><p>Presenter screen</p></div>'+
+    '<div class="fpl"><div class="k">PLANNER</div><div class="v">'+PLANNER+'</div></div></div></div>'+
+    '<div class="pv-wrap" id="pvBody"></div>';
+  document.title='Presenter \u2014 One Page Financial Plan';
+  var saved=''; try{ saved=sessionStorage.getItem('jugnu.pcode')||''; }catch(e){}
+  if(saved){ PCODE=saved; pvLoad(); } else pvLogin('');
+}
+function pvLogin(msg){
+  clearInterval(PV_TIMER);
+  document.getElementById('pvBody').innerHTML='<div class="pv-card"><h2>Enter your planner code</h2>'+
+    '<div class="pv-row"><input id="pvCode" type="password" autocomplete="current-password" style="max-width:260px">'+
+    '<button class="pv-btn" id="pvGo">Enter</button></div>'+(msg?'<p class="pv-msg">'+msg+'</p>':'')+'</div>';
+  var go=function(){ PCODE=(document.getElementById('pvCode').value||'').trim(); if(PCODE) pvLoad(); };
+  document.getElementById('pvGo').onclick=go;
+  document.getElementById('pvCode').onkeydown=function(e){ if(e.key==='Enter') go(); };
+  document.getElementById('pvCode').focus();
+}
+function pvLoad(){
+  sessionCall({act:'stats', code:PCODE}).then(function(d){
+    if(!d.ok && d.error==='code'){ try{ sessionStorage.removeItem('jugnu.pcode'); }catch(e){} return pvLogin('That code is not right.'); }
+    try{ sessionStorage.setItem('jugnu.pcode',PCODE); }catch(e){}
+    pvDraw(d);
+  }).catch(function(){ pvLogin('We could not reach the server. Check your internet and try again.'); });
+}
+function pvDraw(d){
+  clearInterval(PV_TIMER);
+  var b=document.getElementById('pvBody'), link=audienceLink();
+  var counts='<div class="pv-count"><div><span>Reports made</span><b id="pvR">'+d.reports+'</b></div>'+
+             '<div><span>Devices</span><b id="pvD">'+d.devices+'</b></div></div>';
+  if(d.open){
+    b.innerHTML='<div class="pv-card"><div class="pv-state on"><i></i>Open</div>'+
+      '<div class="pv-facts"><span>Workshop</span><b>'+esc(d.name)+'</b>'+
+      '<span>Opened</span><b>'+pvTime(d.openedAt)+'</b>'+
+      '<span>Closes by itself</span><b>'+pvTime(d.closesAt)+'</b></div>'+counts+
+      '<div class="pv-row" style="margin-top:16px"><button class="pv-btn stop" id="pvClose">Close the form</button></div></div>'+
+      '<div class="pv-card"><h2>Share with the room</h2><div class="pv-link"><div id="pvQR"></div>'+
+      '<div style="flex:1;min-width:220px"><code>'+esc(link)+'</code>'+
+      '<div class="pv-row" style="margin-top:10px"><button class="pv-btn lite" id="pvCopy">Copy link</button></div>'+
+      '<p class="pv-note">Counts refresh every 10 seconds.</p></div></div></div>';
+    document.getElementById('pvClose').onclick=function(){ this.disabled=true;
+      sessionCall({act:'close', code:PCODE}).then(pvDraw).catch(function(){ pvLoad(); }); };
+    document.getElementById('pvCopy').onclick=function(){ var t=this;
+      try{ navigator.clipboard.writeText(link).then(function(){ t.textContent='Copied'; }); }catch(e){} };
+    pvQR(link);
+    PV_TIMER=setInterval(function(){
+      sessionCall({act:'stats', code:PCODE}).then(function(n){
+        if(!n.ok) return;
+        if(!n.open) return pvDraw(n);
+        document.getElementById('pvR').textContent=n.reports;
+        document.getElementById('pvD').textContent=n.devices;
+      }).catch(function(){});
+    },10000);
+  } else {
+    b.innerHTML='<div class="pv-card"><div class="pv-state"><i></i>Closed</div>'+
+      '<p class="pv-note" style="margin-top:6px">The form link shows \u201cThis session is closed\u201d until you open it.</p>'+
+      '<div style="margin-top:16px"><label for="pvName">Workshop name</label>'+
+      '<div class="pv-row"><input id="pvName" maxlength="80" placeholder="e.g. Asian Paints \u2014 Oct 2026">'+
+      '<button class="pv-btn" id="pvOpen">Open the form</button></div><p class="pv-msg hide" id="pvErr"></p></div></div>'+
+      (d.sid ? '<div class="pv-card"><h2>Last session</h2><div class="pv-facts"><span>Workshop</span><b>'+esc(d.name)+'</b>'+
+        '<span>Opened</span><b>'+pvTime(d.openedAt)+'</b></div>'+counts+'</div>' : '');
+    document.getElementById('pvOpen').onclick=function(){
+      var n=(document.getElementById('pvName').value||'').trim(), e=document.getElementById('pvErr');
+      if(!n){ e.textContent='Type the workshop name first.'; e.classList.remove('hide'); return; }
+      this.disabled=true;
+      sessionCall({act:'open', code:PCODE, name:n}).then(pvDraw).catch(function(){ pvLoad(); });
+    };
+  }
+}
+function pvQR(link){
+  var host=document.getElementById('pvQR'); if(!host) return;
+  function draw(){ host.innerHTML=''; try{ new QRCode(host,{text:link,width:170,height:170}); }catch(e){} }
+  if(window.QRCode) return draw();
+  var sc=document.createElement('script');
+  sc.src='https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+  sc.onload=draw; document.head.appendChild(sc);
 }
 
 /* ═══════════ remember what was typed, on this device only ═══════════ */
@@ -2741,5 +2930,9 @@ function startFresh(){
     b.addEventListener('click',function(){ contStep(+b.dataset.step); }); });
   document.addEventListener('input',saveState,true);
   document.addEventListener('click',function(e){ if(e.target.closest('button')) saveState(); },true);
+
+  /* presenter screen at #present; everyone else waits for an open session */
+  if(location.hash==='#present') presenterStart(); else audienceStart();
+  window.addEventListener('hashchange',function(){ location.reload(); });
 })();
 </script>
