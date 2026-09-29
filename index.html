@@ -2648,15 +2648,15 @@ function submitForm(){
   /* the session is checked again at the last moment — a closed session stops here */
   var go=document.getElementById('fgo'), was=go.textContent;
   go.disabled=true; go.textContent='Checking\u2026';
-  sessionCall({act:'status'}).then(function(st){
+  sessionTry({act:'status'}).then(function(st){
     go.disabled=false; go.textContent=was;
     if(!st.open || !SESSION || st.sid!==SESSION.sid){ SESSION=null; gate('closed'); return; }
     renderPlan();
-    sessionCall({act:'report', sid:SESSION.sid, dev:deviceId()}).catch(function(){});
+    sessionTry({act:'report', sid:SESSION.sid, dev:deviceId()}).catch(function(){});
   }).catch(function(){
     go.disabled=false; go.textContent=was;
     document.getElementById('needTitle').textContent='No connection';
-    document.getElementById('needMsg').innerHTML='We could not reach the server. Check your internet and press <b>Show me my plan</b> again.';
+    document.getElementById('needMsg').innerHTML='We could not reach the server. Check your internet and press <b>Show me my plan</b> again. On office Wi-Fi? Try mobile data.';
     document.getElementById('needModal').classList.add('on');
   });
   return false;
@@ -2739,6 +2739,17 @@ function sessionCall(params){
     if(t) clearTimeout(t);
     return r.json(); });
 }
+/* Google runs at most about 30 requests at once for one script. When a room of
+   people opens the link in the same moment, some requests are turned away —
+   so every call quietly tries again, up to 4 more times, a few seconds apart. */
+function sessionTry(params, tries){
+  tries = tries===undefined ? 4 : tries;
+  return sessionCall(params).catch(function(err){
+    if(tries<=0) throw err;
+    var wait=1000+Math.random()*3000;
+    return new Promise(function(res){ setTimeout(res,wait); }).then(function(){ return sessionTry(params, tries-1); });
+  });
+}
 /* a random number that stays on this phone or computer — used only to count devices */
 function deviceId(){
   var k='jugnu.device', v='';
@@ -2758,7 +2769,7 @@ function gate(kind){
   card.innerHTML = kind==='checking'
     ? '<div class="spin"></div><p>Opening the form\u2026</p>'
     : kind==='offline'
-    ? '<h2>We could not connect</h2><p>Check your internet and try again.</p>'+
+    ? '<h2>We could not connect</h2><p>Check your internet and try again.<br>On office Wi-Fi? Try mobile data.</p>'+
       '<div class="gbtns"><button class="pv-btn" onclick="audienceStart()">Try again</button></div>'
     : '<h2>This session is closed</h2><p>For a financial plan, contact <b>'+PLANNER+'</b>.</p>'+
       '<div class="gbtns"><a class="btn wa" href="https://wa.me/'+WHATSAPP+'" target="_blank" rel="noopener">WhatsApp '+first+'</a>'+
@@ -2767,7 +2778,7 @@ function gate(kind){
 }
 function audienceStart(){
   gate('checking');
-  sessionCall({act:'status'}).then(function(st){
+  sessionTry({act:'status'}).then(function(st){
     if(st.open){ SESSION={sid:st.sid, name:st.name}; gate('open'); }
     else { SESSION=null; gate('closed'); }
   }).catch(function(){ gate('offline'); });
