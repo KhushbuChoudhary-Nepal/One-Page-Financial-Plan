@@ -871,6 +871,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
 #retModal .skip{font-size:13.5px;}
 .gt tr.gtot td.all{white-space:normal;}
 .retlist .altline{display:block;margin-top:6px;}
+.retnote.altnote{border-top:none;padding-top:0;margin-top:6px;}
 @media print{ .retlist .altline{margin-top:4pt;} }
 .gt tr.gtot td.nx{color:var(--green);font-family:var(--f-d);white-space:nowrap;}
 .needbul{margin:4px 0 0;padding-left:18px;}
@@ -1337,12 +1338,14 @@ function computePlan(d,alt){
 
   /* goals, grouped by horizon, costs exactly as entered */
   var yr=new Date().getFullYear();
-  o.goals=(d.goals||[]).filter(function(g){return g.name && +g.cost>0 && +g.year>yr;})
+  var ml=11-new Date().getMonth();                 /* months left this year */
+  o.goals=(d.goals||[]).filter(function(g){return g.name && +g.cost>0 && (+g.year>yr || (+g.year===yr && ml>0));})
     /* for the comparison line only: the retirement goal at our figure */
     .map(function(g){ return (alt && g.name==='Retirement Fund') ? Object.assign({},g,{cost:alt}) : g; })
     .map(function(g){ var yearly=g.freq==='year';
       var span  = yearly ? Math.max(1, +g.span || (+g.year-(+g.from||yr)+1)) : 1;
-      var start = yearly ? Math.max(yr+1, +g.from||yr+1) : +g.year;
+      var first = ml>0 ? yr : yr+1;
+      var start = yearly ? Math.max(first, +g.from||first) : +g.year;
       var years = start-yr;
       /* a recurring goal is a stream: each year gets its own runway, and the
          cost of a later trip carries that many years of inflation */
@@ -1368,6 +1371,7 @@ function computePlan(d,alt){
   var rg=null;
   o.goals.forEach(function(g){ if(g.name==='Retirement Fund') rg=g; });
   if(rg) o.retAge=o.age+rg.years;
+  if(rg && rg.years===0) o.ret={ age:o.age, put:rg.total, now:true, short:false, near:false };
   if(rg && o.out>0){
     var n=rg.years, retAge=o.age+n, N=RATES.liveTo-retAge;
     if(n>0 && N>0){
@@ -1403,25 +1407,31 @@ function computePlan(d,alt){
 
   /* what it takes every month — after what you already own has been put to work */
   function rateFor(b){ return b==='short'?0.05 : b==='medium'?0.10 : 0.12; }
-  var pool = Math.max(0, o.assets - o.efTarget);   /* everything you own, less the emergency fund */
+  /* SSF / EPF / CIT is locked for retirement, so it funds the retirement goal only;
+     everything else you own, less the emergency fund, goes nearest goal first */
+  var pools = { ret: o.ssf, other: Math.max(0, o.assets - o.ssf - o.efTarget) };
   var usedNow = 0;
   /* you can only invest while you are earning */
-  var retYears = Math.max(1, (o.ret ? o.ret.age : RATES.retAge) - o.age);
+  var retYears = Math.max(1, (o.retAge||RATES.retAge) - o.age);
   o.goals.slice().sort(function(a,b){return a.year-b.year;}).forEach(function(g){
     var legs=[];
     if(g.yearly){ for(var k=0;k<g.span;k++)
         legs.push({years:g.years+k, amt:g.cost*Math.pow(1+RATES.infl,g.years+k)}); }
     else legs.push({years:g.years, amt:g.total});
     var need=0, per=0, after=false;
+    var order = g.name==='Retirement Fund' ? ['ret','other'] : ['other'];
     legs.forEach(function(L){
       var r=rateFor(bandOf(L.years)), amt=L.amt;
-      if(pool>0 && amt>0){
-        var pv=amt/Math.pow(1+r,L.years);
-        var t2=Math.min(pool,pv);
-        pool-=t2; usedNow+=t2; amt-=t2*Math.pow(1+r,L.years);
-      }
+      order.forEach(function(k){
+        if(pools[k]>0 && amt>0){
+          var pv=amt/Math.pow(1+r,L.years);
+          var t2=Math.min(pools[k],pv);
+          pools[k]-=t2; usedNow+=t2; amt-=t2*Math.pow(1+r,L.years);
+        }
+      });
       amt=Math.max(0,amt); need+=amt;
       if(L.years>retYears) after=true;
+      if(L.years===0){ if(amt>0) per+=amt/Math.max(1,ml); return; }   /* this year: spread over the months left */
       var cy=Math.min(L.years,retYears);           /* you can only invest while you earn */
       var grow=stepFV(1,r,cy,RATES.stepUp)*Math.pow(1+r,L.years-cy);
       if(amt>0) per+=amt/grow;
@@ -1585,16 +1595,29 @@ function renderReport(o){
       '</p>';
   }
 
+  /* the comparison line sits under the goals table unless the left column is
+     already full (eight goals plus their groups and extra lines) — then it
+     moves into the retirement box, so the plan stays on two pages */
+  var leftRows = o.goals.length + o.bands.length + o.goals.filter(function(g){ return g.yearly; }).length
+               + (o.needMo<=0 ? 1 : 0) + (o.save<=0 ? 1 : 0);
+  var altLeft = !!o.alt && leftRows<=11;
+  if(altLeft) gapNote += '<p class="retnote altnote">Your retirement estimate is <b>'+compact(o.alt.put)+
+      '</b>. If you plan for <b>'+compact(o.alt.fig)+'</b> instead, the required investment becomes about <b>'+
+      compact(o.alt.needMo)+'</b> a month.</p>';
   var retNote='';
-  if(o.ret){
+  if(o.ret && o.ret.now){
+    retNote='<div class="retlist"><p>At <b>'+o.ret.age+'</b> the earning stops, the spending does not. '+
+      'You have set aside <b>'+compact(o.ret.put)+'</b> for retirement this year. '+
+      'Do a periodic review to check the same number still holds.</p></div>';
+  } else if(o.ret){
     retNote='<div class="retlist">'+
       '<p>At <b>'+o.ret.age+'</b> the earning stops, the spending does not. '+
       'You have estimated <b>'+compact(o.ret.put)+'</b> for retirement &mdash; '+
       (o.ret.short
         ? 'with rising costs and longer lives it might fall short. For a stress-free retirement, aim for '+
           'a corpus of <b>'+corpusTxt(o.ret.corpus)+'</b>. Also, do a periodic review to check the same number still holds.'+
-          (o.alt ? '<span class="altline">Planning for <b>'+compact(o.alt.fig)+'</b> would mean investing about <b>'+
-            compact(o.alt.needMo)+'</b> a month in total, instead of the amount shown in the goals table.</span>' : '')
+          (o.alt && !altLeft ? '<span class="altline">Your retirement estimate is <b>'+compact(o.alt.put)+'</b>. If you plan for <b>'+
+            compact(o.alt.fig)+'</b> instead, the required investment becomes about <b>'+compact(o.alt.needMo)+'</b> a month.</span>' : '')
         : o.ret.near
         ? 'that is nearly there. It will likely meet the need, with not much to spare. '+
           'Do a periodic review to check the same number still holds.'
@@ -1650,7 +1673,14 @@ function renderReport(o){
           '</div></div>'+
         '</div>'; }
   function cardAssets(n){
-    var left=Math.max(1,o.retAge-o.age);
+    var left=Math.max(0,o.retAge-o.age);
+    if(left===0) return '<div class="ac a4 sg"><div class="hd"><span class="num">'+n+'</span><h4>Build assets that pay you</h4></div>'+
+      '<div class="cv"><div class="chart">'+treeSvg(o)+'</div>'+
+      '<div class="lgd"><span><i style="background:#6BB8A5"></i>Years you build</span>'+
+      '<span><i style="background:#E8A81C"></i>Years it pays you</span></div></div>'+
+      '<div class="cb"><div class="txt">You plan to retire this year at '+o.retAge+'. After that, the salary stops and your spending does not. '+
+      'Use the months left to <b>clear any loans and rearrange your investments to give you a regular income</b>, so that you live a stress-free retirement.</div></div>'+
+    '</div>';
     return '<div class="ac a4 sg"><div class="hd"><span class="num">'+n+'</span><h4>Build assets that pay you</h4></div>'+
       '<div class="cv"><div class="chart">'+treeSvg(o)+'</div>'+
       '<div class="lgd"><span><i style="background:#6BB8A5"></i>Years you build</span>'+
@@ -1841,7 +1871,7 @@ function drawCharts(o){
       svg.appendChild(el('line',{x1:X(m),x2:X(m),y1:T,y2:T+ph,stroke:RULE,'stroke-width':1,'stroke-dasharray':'2 3'}));
       svg.appendChild(el('circle',{cx:X(m),cy:Y(o.step[m]),r:2.6,fill:AMBER}));
       svg.appendChild(el('circle',{cx:X(m),cy:Y(o.flat[m]),r:2.6,fill:GREEN})); });
-    [[0,'today']].concat(marks.map(function(m){return [m,m+' yrs'];})).concat([[N,'at '+(o.age+N)]]).forEach(function(a){
+    [[0,'today']].concat(marks.map(function(m){return [m,m+' yrs'];})).concat([[N,'at '+(o.retAge||o.age+N)]]).forEach(function(a){
       tx(svg,X(a[0]),H-4,a[1],{fill:MUTE,'font-size':10,'font-family':MONO,
         'text-anchor':a[0]===0?'start':(a[0]===N?'end':'middle')}); });
     var hit=el('rect',{x:L,y:T,width:pw,height:ph,fill:'transparent'}); svg.appendChild(hit);
@@ -1983,6 +2013,9 @@ function refreshHints(){
 
 /* ---- goal rows ---- */
 var YR0=new Date().getFullYear();
+/* months left in this year after the current one: 3 in September, 0 in December */
+var ML=11-new Date().getMonth();
+var YLO=YR0+(ML>0?0:1);          /* the first year a goal can be set for */
 var RET_MIN=40, RET_MAX=65;
 var MAXGOALS=8;
 function yearOpts(lo,hi,extra){
@@ -1993,10 +2026,9 @@ function yearOpts(lo,hi,extra){
 }
 function yearSel(g){
   var age=+(document.getElementById('f_age')||{}).value||0;
-  var lo=YR0+1, hi=YR0+45;
+  var lo=YLO, hi=YR0+45;
   if(g&&g.retire&&age>=15){
-    lo=YR0+Math.max(1,RET_MIN-age);
-    hi=YR0+Math.max(1,RET_MAX-age);
+    hi=YR0+Math.max(0,RET_MAX-age);         /* any year from now up to age 65 */
     if(hi<lo) hi=lo;
   }
   return '<span class="gy-w"><i class="glab">By when</i><select class="gy">'+yearOpts(lo,hi)+'</select>'+
@@ -2019,7 +2051,7 @@ function optsRow(def){
       '<button type="button" data-f="once"'+(def!=='year'?' class="on"':'')+'>One time</button>'+
       '<button type="button" data-f="year"'+(def==='year'?' class="on"':'')+'>Every year</button>'+
     '</span>'+
-    '<span class="range hide">from <select class="gfrom">'+yearOpts(YR0+1,YR0+35)+'</select>'+
+    '<span class="range hide">from <select class="gfrom">'+yearOpts(YLO,YR0+35)+'</select>'+
     ' to <select class="gto"></select></span>'+
   '</span>';
 }
@@ -2029,7 +2061,7 @@ function retireYear(){
 }
 function syncTo(d){
   var gf=d.querySelector('.gfrom'), gt=d.querySelector('.gto'); if(!gt) return;
-  var f=+gf.value||0, lo=(f?f:YR0+1)+1, hi=Math.max(lo, retireYear());
+  var f=+gf.value||0, lo=(f?f:YLO)+1, hi=Math.max(lo, retireYear());
   var keep=gt.value;
   gt.innerHTML=yearOpts(lo,hi,true);
   gt.value = (keep && (keep==='life' || (+keep>=lo && +keep<=hi))) ? keep : '';
@@ -2057,7 +2089,7 @@ function paintDur(d){
     var sp=spanYears(d);
     box.value = !sp ? '—' : (isLife(d) ? 'Lifetime' : sp+(sp===1?' yr':' yrs'));
   } else {
-    box.value = n>0 ? (n===1?'1 yr':n+' yrs') : '—';
+    box.value = n>0 ? (n===1?'1 yr':n+' yrs') : (y ? 'This year' : '—');
   }
   var sr=d.querySelector('.gspan');
   if(sr){ var f=+(d.querySelector('.gfrom')||{}).value||0;
