@@ -875,6 +875,12 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
 @media print{ .retlist .altline{margin-top:4pt;} }
 .gt tr.gtot td.nx{color:var(--green);font-family:var(--f-d);white-space:nowrap;}
 .needbul{margin:4px 0 0;padding-left:18px;}
+.fbline{margin:8px 0 10px;font-size:13px;color:var(--mute);}
+.fbline.sent{color:#0B6F5C;font-weight:600;}
+.fbline.failed{color:var(--red);}
+.fbline .resend{margin-left:6px;border:none;border-radius:7px;padding:5px 12px;background:var(--red);color:#fff;
+  font-family:var(--f-b);font-weight:700;font-size:12.5px;cursor:pointer;}
+@media print{ .fbline{display:none!important;} }
 /* ── session lock: what the audience sees when the form is not open ── */
 .gatecard{background:var(--card);border:1px solid var(--rule);border-radius:12px;padding:26px 24px;margin-top:22px;text-align:center;}
 .gatecard h2{font-family:var(--f-d);font-size:20px;margin:0 0 8px;color:var(--ink);}
@@ -1141,6 +1147,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
       <div class="tick">&#10003;</div>
       <h3>Thank you.</h3>
       <p class="ms">Your plan is saved.</p>
+      <p class="fbline sending" id="fbLine"></p>
       <p class="tx" id="thxLine">For more on financial planning, connect with the planner on LinkedIn.</p>
       <a class="btn lin" id="thxLi" href="https://www.linkedin.com/in/khushbuchoudhary" target="_blank" rel="noopener">Connect on LinkedIn</a>
       <button type="button" class="thxClose" onclick="closeThanks()">Close</button>
@@ -1812,6 +1819,7 @@ function renderReport(o){
         '<a class="btn wa" href="https://wa.me/'+WHATSAPP+'?text='+encodeURIComponent('Hi '+PLANNER.split(' ')[0]+', this is '+(o.name||'someone')+(o.company? ' from '+o.company : '')+'. I just did the One Page Financial Plan and I’d like a detailed plan.')+'" target="_blank" rel="noopener">Connect with '+PLANNER.split(' ')[0]+'</a>'+
       '</div>'+
       '<button class="btn pdf" onclick="askRating()">Save this report as PDF</button>'+
+      '<p class="fbline hide" id="fbLine2"></p>'+
       /* This line only ever prints. It is read by the person who made the plan and,
          when the PDF travels into a company proposal, by whoever reviews it there —
          so it offers help rather than asking for business. */
@@ -2712,19 +2720,39 @@ function finishAndPrint(){
 function closeThanks(){
   document.getElementById('rateModal').classList.remove('on');
 }
+var LAST_FB=null;
 function sendFeedback(p){
   if(!FEEDBACK_URL) return;
-  try{
-    var q = '?name='    + encodeURIComponent(PLAN? PLAN.name : '')
+  LAST_FB=p; fbState('sending');
+  var q = '?name='    + encodeURIComponent(PLAN? PLAN.name : '')
           + '&location='+ encodeURIComponent(PLAN? (PLAN.place||'') : '')
           + '&ref='     + encodeURIComponent(REFCO || '')
           + '&rating='  + encodeURIComponent(p.rating||'')
           + '&message=' + encodeURIComponent((p.comment||'').slice(0,900))
           + '&ws='      + encodeURIComponent(SESSION ? SESSION.name : '');
-    var img = new Image();
-    img.src = FEEDBACK_URL + q;      /* a plain GET — no CORS, and it cannot fail loudly */
-  }catch(e){}
+  /* up to 5 tries, a few seconds apart; "ok" back from Google means it is in the sheet */
+  (function go(left){
+    fetch(FEEDBACK_URL+q).then(function(r){ return r.text(); }).then(function(t){
+      if(String(t).trim()!=='ok') throw new Error('busy');
+      fbState('sent');
+    }).catch(function(){
+      if(left>0) setTimeout(function(){ go(left-1); }, 1500+Math.random()*3500);
+      else fbState('failed');
+    });
+  })(4);
 }
+/* the line in the thank-you box, and under "Save this report as PDF" */
+function fbState(k){
+  var html = k==='sending' ? 'Sending your rating\u2026'
+           : k==='sent'    ? '\u2713 Your rating reached '+PLANNER.split(' ')[0]+'.'
+           : 'Your rating could not be sent. <button type="button" class="resend" onclick="resendFeedback()">Send again</button>';
+  ['fbLine','fbLine2'].forEach(function(id){
+    var e=document.getElementById(id); if(!e) return;
+    e.className='fbline '+k+(id==='fbLine2' && k!=='failed' ? ' hide' : '');
+    e.innerHTML=html;
+  });
+}
+function resendFeedback(){ if(LAST_FB) sendFeedback(LAST_FB); }
 
 /* ═══════════ workshop sessions ═══════════ */
 /* The form opens only while Khushbu has a session open on the presenter screen
@@ -2744,7 +2772,10 @@ function sessionCall(params){
    so every call quietly tries again, up to 4 more times, a few seconds apart. */
 function sessionTry(params, tries){
   tries = tries===undefined ? 4 : tries;
-  return sessionCall(params).catch(function(err){
+  return sessionCall(params).then(function(d){
+    if(d && d.ok===false && d.error==='server') throw new Error('busy');   /* Google busy — try again */
+    return d;
+  }).catch(function(err){
     if(tries<=0) throw err;
     var wait=1000+Math.random()*3000;
     return new Promise(function(res){ setTimeout(res,wait); }).then(function(){ return sessionTry(params, tries-1); });
