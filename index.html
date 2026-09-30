@@ -2663,11 +2663,17 @@ function submitForm(){
     go.disabled=false; go.textContent=was;
     if(!d || !d.ok){
       if(d && d.error==='closed'){ SESSION=null; gate('closed'); return; }
-      throw new Error('Submission not accepted');
+      throw new Error('Submission not accepted: '+(d && d.error || 'empty response'));
     }
     LAST_REPORT_ID=attempt.rid;
-    renderPlan();
-  }).catch(function(){
+    try { renderPlan(); } catch(err) {
+      console.error('Report display failed',err);
+      document.getElementById('needTitle').textContent='Report display problem';
+      document.getElementById('needMsg').textContent='Your submission was accepted, but the report could not be displayed. Please tell the presenter.';
+      document.getElementById('needModal').classList.add('on');
+    }
+  }).catch(function(err){
+    console.error('Report submission failed',err);
     go.disabled=false; go.textContent=was;
     document.getElementById('needTitle').textContent='No connection';
     document.getElementById('needMsg').innerHTML='We could not reach the server. Check your internet and press <b>Show me my plan</b> again. On office Wi-Fi? Try mobile data.';
@@ -2773,7 +2779,7 @@ function resendFeedback(){ if(LAST_FB) sendFeedback(LAST_FB).catch(function(){})
    the Google Apps Script, never in this page. */
 var SESSION=null, PCODE='', PV_TIMER=null;
 function sessionCall(params){
-  var q=Object.keys(params).map(function(k){return encodeURIComponent(k)+'='+encodeURIComponent(params[k]);}).join('&');
+  var q=Object.keys(params).map(function(k){return encodeURIComponent(k==='sid'?'sessionId':k)+'='+encodeURIComponent(params[k]);}).join('&');
   var ctl=window.AbortController?new AbortController():null;
   var timer=ctl?setTimeout(function(){ctl.abort();},45000):null;
   return fetch(FEEDBACK_URL+'?'+q,ctl?{signal:ctl.signal,cache:'no-store'}:{cache:'no-store'}).then(function(r){
