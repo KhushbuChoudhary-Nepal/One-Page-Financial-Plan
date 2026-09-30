@@ -34,7 +34,7 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
 <style>
 :root{
   --navy:#14274A; --navy-2:#0B6F5C; --navy-3:#9C7222;
@@ -1139,14 +1139,14 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
       <div class="stars" id="stars"></div>
       <p class="rword" id="rateWord">1 = poor &nbsp;·&nbsp; 5 = excellent</p>
       <label class="mlab" for="rcomment" id="msgLabel">Any message you want to send to the planner?</label>
-      <textarea id="rcomment" rows="3" placeholder="Type here"></textarea>
+      <textarea id="rcomment" maxlength="300" rows="3" placeholder="Type here"></textarea>
       <button class="btn pdf full" id="saveBtn" onclick="finishAndPrint()" disabled>Save as PDF</button>
       <p class="mhint" id="rateHint">Please tap a star first.</p>
     </div>
     <div id="thanksStep" class="hide">
       <div class="tick">&#10003;</div>
       <h3>Thank you.</h3>
-      <p class="ms">Your plan is saved.</p>
+      <p class="ms">Choose “Save as PDF” in the print window to save your plan.</p>
       <p class="fbline sending" id="fbLine"></p>
       <p class="tx" id="thxLine">For more on financial planning, connect with the planner on LinkedIn.</p>
       <a class="btn lin" id="thxLi" href="https://www.linkedin.com/in/khushbuchoudhary" target="_blank" rel="noopener">Connect on LinkedIn</a>
@@ -2658,9 +2658,14 @@ function submitForm(){
   var go=document.getElementById('fgo'), was=go.textContent;
   if(!SESSION){ gate('closed'); return false; }
   go.disabled=true; go.textContent='Checking\u2026';
-  sessionTry({act:'report', sid:SESSION.sid, dev:deviceId(), rid:newId('r')}).then(function(d){
+  var attempt=reportAttempt();
+  sessionTry(attempt).then(function(d){
     go.disabled=false; go.textContent=was;
-    if(!d || !d.ok){ SESSION=null; gate('closed'); return; }
+    if(!d || !d.ok){
+      if(d && d.error==='closed'){ SESSION=null; gate('closed'); return; }
+      throw new Error('Submission not accepted');
+    }
+    LAST_REPORT_ID=attempt.rid;
     renderPlan();
   }).catch(function(){
     go.disabled=false; go.textContent=was;
@@ -2711,38 +2716,43 @@ function askByRating(n){
               : n===3 ? 'What would make it better?'
                       : 'Is there anything you did not understand?';
 }
+var LAST_REPORT_ID='', FB_IN_FLIGHT=false, REPORT_ATTEMPT=null;
 function finishAndPrint(){
-  if(!RATING) return;
-  sendFeedback({rating:RATING, comment:(document.getElementById('rcomment')||{}).value||''});
-  document.getElementById('rateStep').classList.add('hide');
-  document.getElementById('thanksStep').classList.remove('hide');
-  setTimeout(function(){window.print();},220);
+  if(!RATING || FB_IN_FLIGHT) return;
+  var btn=document.getElementById('saveBtn');btn.disabled=true;btn.textContent='Sending feedback…';
+  var comment=(document.getElementById('rcomment')||{}).value||'';
+  var p=LAST_FB && LAST_FB.rating===RATING && LAST_FB.comment===comment && LAST_FB.params && LAST_FB.params.report===LAST_REPORT_ID ? LAST_FB : {rating:RATING,comment:comment};
+  sendFeedback(p).then(function(){
+    document.getElementById('rateStep').classList.add('hide');
+    document.getElementById('thanksStep').classList.remove('hide');
+    btn.disabled=false;btn.textContent='Save as PDF';
+    setTimeout(function(){window.print();},220);
+  }).catch(function(){
+    btn.disabled=false;btn.textContent='Try sending feedback again';
+    var hint=document.getElementById('rateHint');hint.classList.remove('hide');
+    hint.textContent='Feedback has not been confirmed. Your answers are still here. Please try again.';
+  });
 }
-function closeThanks(){
-  document.getElementById('rateModal').classList.remove('on');
-}
+function closeThanks(){document.getElementById('rateModal').classList.remove('on');}
 var LAST_FB=null;
 function sendFeedback(p){
-  if(!FEEDBACK_URL) return;
-  if(!p.rid) p.rid=newId('f');
-  LAST_FB=p; fbState('sending');
-  var q = '?name='    + encodeURIComponent(PLAN? PLAN.name : '')
-          + '&location='+ encodeURIComponent(PLAN? (PLAN.place||'') : '')
-          + '&ref='     + encodeURIComponent(REFCO || '')
-          + '&rating='  + encodeURIComponent(p.rating||'')
-          + '&message=' + encodeURIComponent((p.comment||'').slice(0,900))
-          + '&ws='      + encodeURIComponent(SESSION ? SESSION.name : '')
-          + '&rid='     + encodeURIComponent(p.rid);
-  /* up to 5 tries, a few seconds apart; "ok" back from Google means it is in the sheet */
-  (function go(left){
-    fetch(FEEDBACK_URL+q).then(function(r){ return r.text(); }).then(function(t){
-      if(String(t).trim()!=='ok') throw new Error('busy');
-      fbState('sent');
-    }).catch(function(){
-      if(left>0) setTimeout(function(){ go(left-1); }, 1500+Math.random()*3500);
-      else fbState('failed');
-    });
-  })(4);
+  if(FB_IN_FLIGHT) return Promise.reject(new Error('Already sending'));
+  if(!p.rid)p.rid=newId('f');
+  if(!p.params)p.params={act:'feedback',sid:SESSION?SESSION.sid:'',rid:p.rid,report:LAST_REPORT_ID,
+    name:PLAN?PLAN.name:'',location:PLAN?(PLAN.place||''):'',ref:REFCO||'',rating:p.rating,
+    message:(p.comment||'').slice(0,300),ws:SESSION?SESSION.name:''};
+  LAST_FB=p; FB_IN_FLIGHT=true;fbState('sending');
+  try{localStorage.setItem('jugnu.pending.feedback',JSON.stringify(p));}catch(e){}
+  return sessionTry(p.params,2).then(function(d){
+    if(!d || !d.ok)throw new Error('Feedback not accepted');
+    FB_IN_FLIGHT=false;fbState('sent');
+    try{localStorage.removeItem('jugnu.pending.feedback');}catch(e){}
+    return d;
+  }).catch(function(e){FB_IN_FLIGHT=false;fbState('failed');throw e;});
+}
+function retrySavedFeedback(){
+  var saved=null;try{saved=JSON.parse(localStorage.getItem('jugnu.pending.feedback')||'null');}catch(e){}
+  if(saved && saved.params)sendFeedback(saved).catch(function(){});
 }
 /* the line in the thank-you box, and under "Save this report as PDF" */
 function fbState(k){
@@ -2755,7 +2765,7 @@ function fbState(k){
     e.innerHTML=html;
   });
 }
-function resendFeedback(){ if(LAST_FB) sendFeedback(LAST_FB); }
+function resendFeedback(){ if(LAST_FB) sendFeedback(LAST_FB).catch(function(){}); }
 
 /* ═══════════ workshop sessions ═══════════ */
 /* The form opens only while Khushbu has a session open on the presenter screen
@@ -2763,26 +2773,35 @@ function resendFeedback(){ if(LAST_FB) sendFeedback(LAST_FB); }
    the Google Apps Script, never in this page. */
 var SESSION=null, PCODE='', PV_TIMER=null;
 function sessionCall(params){
-  var q=Object.keys(params).map(function(k){ return encodeURIComponent(k)+'='+encodeURIComponent(params[k]); }).join('&');
-  var ctl = window.AbortController ? new AbortController() : null;
-  var t = ctl ? setTimeout(function(){ ctl.abort(); },30000) : null;
-  return fetch(FEEDBACK_URL+'?'+q, ctl?{signal:ctl.signal}:{}).then(function(r){
-    if(t) clearTimeout(t);
-    return r.json(); });
+  var q=Object.keys(params).map(function(k){return encodeURIComponent(k)+'='+encodeURIComponent(params[k]);}).join('&');
+  var ctl=window.AbortController?new AbortController():null;
+  var timer=ctl?setTimeout(function(){ctl.abort();},45000):null;
+  return fetch(FEEDBACK_URL+'?'+q,ctl?{signal:ctl.signal,cache:'no-store'}:{cache:'no-store'}).then(function(r){
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    return r.json();
+  }).then(function(d){if(timer)clearTimeout(timer);return d;},function(e){if(timer)clearTimeout(timer);throw e;});
 }
-/* Google runs at most about 30 requests at once for one script. When a room of
-   people opens the link in the same moment, some requests are turned away —
-   so every call quietly tries again, up to 4 more times, a few seconds apart. */
-function sessionTry(params, tries){
-  tries = tries===undefined ? 4 : tries;
+function sessionTry(params,tries){
+  tries=tries===undefined?2:tries;
+  if(params.act==='open' && !params.oid)params.oid=newId('o');
   return sessionCall(params).then(function(d){
-    if(d && d.ok===false && d.error==='server') throw new Error('busy');   /* Google busy — try again */
+    if(d && !d.ok && (d.error==='server' || d.error==='capacity'))throw new Error('Server busy');
     return d;
   }).catch(function(err){
-    if(tries<=0) throw err;
-    var wait=1000+Math.random()*3000;
-    return new Promise(function(res){ setTimeout(res,wait); }).then(function(){ return sessionTry(params, tries-1); });
+    if(tries<=0)throw err;
+    var wait=2000+Math.random()*6000;
+    return new Promise(function(res){setTimeout(res,wait);}).then(function(){return sessionTry(params,tries-1);});
   });
+}
+function reportAttempt(){
+  var fingerprint=JSON.stringify(snapshot()),saved=REPORT_ATTEMPT;
+  try{saved=JSON.parse(localStorage.getItem('jugnu.pending.report')||'null')||saved;}catch(e){}
+  if(!saved || saved.sid!==SESSION.sid || saved.fingerprint!==fingerprint)
+    saved={act:'report',sid:SESSION.sid,dev:deviceId(),rid:newId('r'),fingerprint:fingerprint};
+  REPORT_ATTEMPT=saved;
+  try{localStorage.setItem('jugnu.pending.report',JSON.stringify(saved));}catch(e){}
+  // Financial answers stay on this device; only the random IDs are sent.
+  return {act:saved.act,sid:saved.sid,dev:saved.dev,rid:saved.rid};
 }
 /* a one-off number for each plan or rating, so a retry is never counted twice */
 function newId(k){ return k+Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
@@ -2814,10 +2833,15 @@ function gate(kind){
 }
 function audienceStart(){
   gate('checking');
-  sessionTry({act:'status'}).then(function(st){
-    if(st.open){ SESSION={sid:st.sid, name:st.name}; gate('open'); }
-    else { SESSION=null; gate('closed'); }
-  }).catch(function(){ gate('offline'); });
+  var hint=setTimeout(function(){var c=document.getElementById('gateCard');
+    if(c && c.textContent.indexOf('Opening the form')>=0)c.innerHTML='<div class="spin"></div><p>Waiting for the workshop connection…</p><p>Your answers are safe on this device.</p>';
+  },8000);
+  sessionTry({act:'status'},1).then(function(st){
+    clearTimeout(hint);
+    if(!st || !st.ok)throw new Error('Invalid session response');
+    if(st.open){SESSION={sid:st.sid,name:st.name};gate('open');}
+    else{SESSION=null;gate('closed');}
+  }).catch(function(){clearTimeout(hint);gate('offline');});
 }
 
 /* ---- presenter screen ---- */
@@ -2858,8 +2882,9 @@ function pvLoad(){
 function pvDraw(d){
   clearInterval(PV_TIMER);
   var b=document.getElementById('pvBody'), link=audienceLink();
-  var counts='<div class="pv-count"><div><span>Reports made</span><b id="pvR">'+d.reports+'</b></div>'+
-             '<div><span>Devices</span><b id="pvD">'+d.devices+'</b></div></div>';
+  var counts='<div class="pv-count"><div><span>Reports accepted</span><b id="pvR">'+d.reports+'</b></div>'+
+             '<div><span>Devices</span><b id="pvD">'+d.devices+'</b></div></div>'+
+             '<p class="pv-note" id="pvSync">'+syncMessage(d)+'</p><button class="pv-btn lite" id="pvTransfer">Copy pending entries to Sheet</button>';
   if(d.open){
     b.innerHTML='<div class="pv-card"><div class="pv-state on"><i></i>Open</div>'+
       '<div class="pv-facts"><span>Workshop</span><b>'+esc(d.name)+'</b>'+
@@ -2875,13 +2900,17 @@ function pvDraw(d){
     document.getElementById('pvCopy').onclick=function(){ var t=this;
       try{ navigator.clipboard.writeText(link).then(function(){ t.textContent='Copied'; }); }catch(e){} };
     pvQR(link);
+    var polling=false;
     PV_TIMER=setInterval(function(){
+      if(polling)return;polling=true;
       sessionTry({act:'stats', code:PCODE}, 1).then(function(n){
+        polling=false;
         if(!n.ok) return;
         if(!n.open) return pvDraw(n);
         document.getElementById('pvR').textContent=n.reports;
         document.getElementById('pvD').textContent=n.devices;
-      }).catch(function(){});
+        var sync=document.getElementById('pvSync');if(sync)sync.textContent=syncMessage(n);
+      }).catch(function(){polling=false;});
     },10000);
   } else {
     b.innerHTML='<div class="pv-card"><div class="pv-state"><i></i>Closed</div>'+
@@ -2898,7 +2927,9 @@ function pvDraw(d){
       sessionTry({act:'open', code:PCODE, name:n}).then(pvDraw).catch(function(){ pvLoad(); });
     };
   }
+  var transfer=document.getElementById('pvTransfer');if(transfer)transfer.onclick=function(){this.disabled=true;sessionTry({act:'flush',code:PCODE},1).then(pvDraw).catch(function(){transfer.disabled=false;document.getElementById('pvSync').textContent='Transfer could not be confirmed. Please try again.';});};
 }
+function syncMessage(d){var s=d.sync||{};if(s.ok===false)return 'Sheet transfer needs a retry. Accepted entries remain saved.';if(!s.at)return 'Accepted entries are copied to the Sheet automatically once a minute.';return 'Last Sheet transfer: '+pvTime(s.at)+(s.pending?' — more entries are waiting.':'.');}
 function pvQR(link){
   var host=document.getElementById('pvQR'); if(!host) return;
   function draw(){ host.innerHTML=''; try{ new QRCode(host,{text:link,width:170,height:170}); }catch(e){} }
@@ -2989,6 +3020,7 @@ function startFresh(){
 
 /* ═══════════ boot ═══════════ */
 (function(){
+ try {
   readRef(); bindSegs(); bindMulti('s_dep'); buildGoals(); spendHintText();
   document.getElementById('addOwn').addEventListener('click',addOwn);
   document.getElementById('f_country').addEventListener('change',setCurrency);
@@ -3002,7 +3034,8 @@ function startFresh(){
   document.getElementById('sNext').addEventListener('click',nextStep);
   document.getElementById('sBack').addEventListener('click',function(){ goStep(STEP-1); });
   syncStepMode(); paintStep();
-  window.matchMedia('(max-width:1024px)').addEventListener('change',syncStepMode);
+  var media=window.matchMedia('(max-width:1024px)');
+  if(media.addEventListener)media.addEventListener('change',syncStepMode);else if(media.addListener)media.addListener(syncStepMode);
   /* an EMI means a loan: answer "Yes" and open the loan amount box */
   document.getElementById('f_emi').addEventListener('input',function(){
     if(val('f_emi')>0 && segVal('s_hasloan')!=='yes'){
@@ -3023,13 +3056,16 @@ function startFresh(){
 
   /* bring back whatever they typed last time */
   document.getElementById('freshBtn').addEventListener('click',startFresh);
-  if(restoreState()){ document.getElementById('restoredBar').classList.remove('hide'); REVEAL=4; paintStep(); }
+  try{if(restoreState()){document.getElementById('restoredBar').classList.remove('hide');REVEAL=4;paintStep();}}catch(e){console.warn('Saved answers could not be restored.');}
   [].forEach.call(document.querySelectorAll('.fcont'),function(b){
     b.addEventListener('click',function(){ contStep(+b.dataset.step); }); });
   document.addEventListener('input',saveState,true);
   document.addEventListener('click',function(e){ if(e.target.closest('button')) saveState(); },true);
 
   /* presenter screen at #present; everyone else waits for an open session */
+  window.addEventListener('online',retrySavedFeedback);
+  retrySavedFeedback();
+ } catch(e){console.error('Page setup failed',e);gate('offline');return;}
   if(location.hash==='#present') presenterStart(); else audienceStart();
   window.addEventListener('hashchange',function(){ location.reload(); });
 })();
