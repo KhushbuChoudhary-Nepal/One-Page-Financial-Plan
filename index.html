@@ -2653,14 +2653,15 @@ function submitForm(){
   if(needsExpConfirm()){ askExp(submitForm); return false; }
   if(needsSpendConfirm()){ askSpend(submitForm); return false; }
   if(needsLoanEmi()){ askLoanEmi(submitForm); return false; }
-  /* the session is checked again at the last moment — a closed session stops here */
+  /* one request at the last moment: Google checks the session is still open and
+     counts this plan. A closed session stops here. */
   var go=document.getElementById('fgo'), was=go.textContent;
+  if(!SESSION){ gate('closed'); return false; }
   go.disabled=true; go.textContent='Checking\u2026';
-  sessionTry({act:'status'}).then(function(st){
+  sessionTry({act:'report', sid:SESSION.sid, dev:deviceId(), rid:newId('r')}).then(function(d){
     go.disabled=false; go.textContent=was;
-    if(!st.open || !SESSION || st.sid!==SESSION.sid){ SESSION=null; gate('closed'); return; }
+    if(!d || !d.ok){ SESSION=null; gate('closed'); return; }
     renderPlan();
-    sessionTry({act:'report', sid:SESSION.sid, dev:deviceId()}).catch(function(){});
   }).catch(function(){
     go.disabled=false; go.textContent=was;
     document.getElementById('needTitle').textContent='No connection';
@@ -2723,13 +2724,15 @@ function closeThanks(){
 var LAST_FB=null;
 function sendFeedback(p){
   if(!FEEDBACK_URL) return;
+  if(!p.rid) p.rid=newId('f');
   LAST_FB=p; fbState('sending');
   var q = '?name='    + encodeURIComponent(PLAN? PLAN.name : '')
           + '&location='+ encodeURIComponent(PLAN? (PLAN.place||'') : '')
           + '&ref='     + encodeURIComponent(REFCO || '')
           + '&rating='  + encodeURIComponent(p.rating||'')
           + '&message=' + encodeURIComponent((p.comment||'').slice(0,900))
-          + '&ws='      + encodeURIComponent(SESSION ? SESSION.name : '');
+          + '&ws='      + encodeURIComponent(SESSION ? SESSION.name : '')
+          + '&rid='     + encodeURIComponent(p.rid);
   /* up to 5 tries, a few seconds apart; "ok" back from Google means it is in the sheet */
   (function go(left){
     fetch(FEEDBACK_URL+q).then(function(r){ return r.text(); }).then(function(t){
@@ -2762,7 +2765,7 @@ var SESSION=null, PCODE='', PV_TIMER=null;
 function sessionCall(params){
   var q=Object.keys(params).map(function(k){ return encodeURIComponent(k)+'='+encodeURIComponent(params[k]); }).join('&');
   var ctl = window.AbortController ? new AbortController() : null;
-  var t = ctl ? setTimeout(function(){ ctl.abort(); },15000) : null;
+  var t = ctl ? setTimeout(function(){ ctl.abort(); },30000) : null;
   return fetch(FEEDBACK_URL+'?'+q, ctl?{signal:ctl.signal}:{}).then(function(r){
     if(t) clearTimeout(t);
     return r.json(); });
@@ -2781,6 +2784,8 @@ function sessionTry(params, tries){
     return new Promise(function(res){ setTimeout(res,wait); }).then(function(){ return sessionTry(params, tries-1); });
   });
 }
+/* a one-off number for each plan or rating, so a retry is never counted twice */
+function newId(k){ return k+Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
 /* a random number that stays on this phone or computer — used only to count devices */
 function deviceId(){
   var k='jugnu.device', v='';
@@ -2842,7 +2847,9 @@ function pvLogin(msg){
   document.getElementById('pvCode').focus();
 }
 function pvLoad(){
-  sessionCall({act:'stats', code:PCODE}).then(function(d){
+  var b=document.getElementById('pvBody');
+  if(b) b.innerHTML='<div class="pv-card"><div class="spin" style="width:26px;height:26px;border-radius:50%;border:3px solid var(--rule);border-top-color:#0B6F5C;animation:spin .9s linear infinite"></div><p class="pv-note">Connecting\u2026</p></div>';
+  sessionTry({act:'stats', code:PCODE}).then(function(d){
     if(!d.ok && d.error==='code'){ try{ sessionStorage.removeItem('jugnu.pcode'); }catch(e){} return pvLogin('That code is not right.'); }
     try{ sessionStorage.setItem('jugnu.pcode',PCODE); }catch(e){}
     pvDraw(d);
@@ -2864,12 +2871,12 @@ function pvDraw(d){
       '<div class="pv-row" style="margin-top:10px"><button class="pv-btn lite" id="pvCopy">Copy link</button></div>'+
       '<p class="pv-note">Counts refresh every 10 seconds.</p></div></div></div>';
     document.getElementById('pvClose').onclick=function(){ this.disabled=true;
-      sessionCall({act:'close', code:PCODE}).then(pvDraw).catch(function(){ pvLoad(); }); };
+      sessionTry({act:'close', code:PCODE}).then(pvDraw).catch(function(){ pvLoad(); }); };
     document.getElementById('pvCopy').onclick=function(){ var t=this;
       try{ navigator.clipboard.writeText(link).then(function(){ t.textContent='Copied'; }); }catch(e){} };
     pvQR(link);
     PV_TIMER=setInterval(function(){
-      sessionCall({act:'stats', code:PCODE}).then(function(n){
+      sessionTry({act:'stats', code:PCODE}, 1).then(function(n){
         if(!n.ok) return;
         if(!n.open) return pvDraw(n);
         document.getElementById('pvR').textContent=n.reports;
@@ -2888,7 +2895,7 @@ function pvDraw(d){
       var n=(document.getElementById('pvName').value||'').trim(), e=document.getElementById('pvErr');
       if(!n){ e.textContent='Type the workshop name first.'; e.classList.remove('hide'); return; }
       this.disabled=true;
-      sessionCall({act:'open', code:PCODE, name:n}).then(pvDraw).catch(function(){ pvLoad(); });
+      sessionTry({act:'open', code:PCODE, name:n}).then(pvDraw).catch(function(){ pvLoad(); });
     };
   }
 }
