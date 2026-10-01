@@ -2717,55 +2717,93 @@ function askByRating(n){
                       : 'Is there anything you did not understand?';
 }
 var LAST_REPORT_ID='', FB_IN_FLIGHT=false, REPORT_ATTEMPT=null;
+var PRINT_PENDING=false;
 function finishAndPrint(){
-  if(!RATING || FB_IN_FLIGHT) return;
-  var btn=document.getElementById('saveBtn');btn.disabled=true;btn.textContent='Sending feedback…';
+  if(!RATING || PRINT_PENDING) return;
   var comment=(document.getElementById('rcomment')||{}).value||'';
   var p=LAST_FB && LAST_FB.rating===RATING && LAST_FB.comment===comment && LAST_FB.params && LAST_FB.params.report===LAST_REPORT_ID ? LAST_FB : {rating:RATING,comment:comment};
-  sendFeedback(p).then(function(){
-    document.getElementById('rateStep').classList.add('hide');
-    document.getElementById('thanksStep').classList.remove('hide');
-    btn.disabled=false;btn.textContent='Save as PDF';
-    setTimeout(function(){window.print();},220);
-  }).catch(function(){
-    btn.disabled=false;btn.textContent='Try sending feedback again';
-    var hint=document.getElementById('rateHint');hint.classList.remove('hide');
-    hint.textContent='Feedback has not been confirmed. Your answers are still here. Please try again.';
-  });
+  sendFeedback(p);
+  document.getElementById('rateStep').classList.add('hide');
+  document.getElementById('thanksStep').classList.remove('hide');
+  var btn=document.getElementById('saveBtn');btn.disabled=false;btn.textContent='Save as PDF';
+  PRINT_PENDING=true;
+  setTimeout(function(){PRINT_PENDING=false;window.print();},220);
 }
 function closeThanks(){document.getElementById('rateModal').classList.remove('on');}
-var LAST_FB=null;
+var LAST_FB=null, FEEDBACK_QUEUE={}, FB_TIMER=null, FB_BACKOFF=0;
+var FEEDBACK_QUEUE_KEY='jugnu.pending.feedback.queue';
+function readFeedbackQueue(){
+  try{
+    var saved=JSON.parse(localStorage.getItem(FEEDBACK_QUEUE_KEY)||'{}');
+    Object.keys(saved).forEach(function(k){var p=saved[k];if(p && p.params && p.params.act==='feedback')FEEDBACK_QUEUE[k]=p;});
+    var legacy=JSON.parse(localStorage.getItem('jugnu.pending.feedback')||'null');
+    if(legacy && legacy.params)FEEDBACK_QUEUE[legacy.params.sid+':'+legacy.rid]=legacy;
+  }catch(e){}
+}
+function saveFeedbackQueue(){
+  try{
+    localStorage.setItem(FEEDBACK_QUEUE_KEY,JSON.stringify(FEEDBACK_QUEUE));
+    localStorage.removeItem('jugnu.pending.feedback');
+  }catch(e){}
+}
 function sendFeedback(p){
-  if(FB_IN_FLIGHT) return Promise.reject(new Error('Already sending'));
   if(!p.rid)p.rid=newId('f');
   if(!p.params)p.params={act:'feedback',sid:SESSION?SESSION.sid:'',rid:p.rid,report:LAST_REPORT_ID,
     name:PLAN?PLAN.name:'',location:PLAN?(PLAN.place||''):'',ref:REFCO||'',rating:p.rating,
     message:(p.comment||'').slice(0,300),ws:SESSION?SESSION.name:''};
-  LAST_FB=p; FB_IN_FLIGHT=true;fbState('sending');
-  try{localStorage.setItem('jugnu.pending.feedback',JSON.stringify(p));}catch(e){}
-  return sessionTry(p.params,2).then(function(d){
-    if(!d || !d.ok)throw new Error('Feedback not accepted');
-    FB_IN_FLIGHT=false;fbState('sent');
-    try{localStorage.removeItem('jugnu.pending.feedback');}catch(e){}
-    return d;
-  }).catch(function(e){FB_IN_FLIGHT=false;fbState('failed');throw e;});
+  LAST_FB=p;readFeedbackQueue();
+  if(!p.sent){FEEDBACK_QUEUE[p.params.sid+':'+p.rid]=p;saveFeedbackQueue();fbState('sending');scheduleFeedbackSync(0);}
+  else fbState('sent');
+  return Promise.resolve(p);
+}
+function scheduleFeedbackSync(delay){
+  if(FB_IN_FLIGHT || FB_TIMER!==null)return;
+  FB_TIMER=setTimeout(function(){FB_TIMER=null;syncFeedbackQueue();},delay);
 }
 function retrySavedFeedback(){
-  var saved=null;try{saved=JSON.parse(localStorage.getItem('jugnu.pending.feedback')||'null');}catch(e){}
-  if(saved && saved.params)sendFeedback(saved).catch(function(){});
+  readFeedbackQueue();saveFeedbackQueue();
+  if(FB_TIMER!==null){clearTimeout(FB_TIMER);FB_TIMER=null;}
+  scheduleFeedbackSync(0);
+}
+function syncFeedbackQueue(){
+  if(FB_IN_FLIGHT || (window.navigator && window.navigator.onLine===false))return;
+  readFeedbackQueue();
+  var key=Object.keys(FEEDBACK_QUEUE)[0];if(!key){FB_BACKOFF=0;return;}
+  var p=FEEDBACK_QUEUE[key];FB_IN_FLIGHT=true;
+  sessionTry(p.params,2).then(function(d){
+    if(!d || !d.ok){
+      if(d && (d.error==='expired' || d.error==='invalid' || d.error==='closed')){
+        readFeedbackQueue();delete FEEDBACK_QUEUE[key];saveFeedbackQueue();
+        FB_IN_FLIGHT=false;FB_BACKOFF=0;
+        if(LAST_FB && LAST_FB.rid===p.rid)fbState('declined');
+        scheduleFeedbackSync(1500+Math.random()*3500);return;
+      }
+      throw new Error('Feedback not accepted');
+    }
+    readFeedbackQueue();delete FEEDBACK_QUEUE[key];saveFeedbackQueue();p.sent=true;
+    FB_IN_FLIGHT=false;FB_BACKOFF=0;
+    if(LAST_FB && LAST_FB.rid===p.rid){LAST_FB.sent=true;fbState('sent');}
+    scheduleFeedbackSync(1500+Math.random()*3500);
+  }).catch(function(e){
+    FB_IN_FLIGHT=false;
+    if(LAST_FB && LAST_FB.rid===p.rid)fbState('failed');
+    FB_BACKOFF=Math.min(120000,FB_BACKOFF?FB_BACKOFF*2:15000);
+    scheduleFeedbackSync(FB_BACKOFF+Math.random()*15000);
+  });
 }
 /* the line in the thank-you box, and under "Save this report as PDF" */
 function fbState(k){
-  var html = k==='sending' ? 'Sending your rating\u2026'
+  var html = k==='sending' ? 'Your rating is sending in the background. You can save your PDF now.'
            : k==='sent'    ? '\u2713 Your rating reached '+PLANNER.split(' ')[0]+'.'
-           : 'Your rating could not be sent. <button type="button" class="resend" onclick="resendFeedback()">Send again</button>';
+           : k==='declined' ? 'Your rating was not accepted. You can still save your PDF.'
+           : 'Your rating is waiting to send. We will retry while this page is open. <button type="button" class="resend" onclick="resendFeedback()">Send again</button>';
   ['fbLine','fbLine2'].forEach(function(id){
     var e=document.getElementById(id); if(!e) return;
     e.className='fbline '+k+(id==='fbLine2' && k!=='failed' ? ' hide' : '');
     e.innerHTML=html;
   });
 }
-function resendFeedback(){ if(LAST_FB) sendFeedback(LAST_FB).catch(function(){}); }
+function resendFeedback(){ if(LAST_FB)sendFeedback(LAST_FB);retrySavedFeedback(); }
 
 /* ═══════════ workshop sessions ═══════════ */
 /* The form opens only while Khushbu has a session open on the presenter screen
