@@ -2653,32 +2653,26 @@ function submitForm(){
   if(needsExpConfirm()){ askExp(submitForm); return false; }
   if(needsSpendConfirm()){ askSpend(submitForm); return false; }
   if(needsLoanEmi()){ askLoanEmi(submitForm); return false; }
-  /* one request at the last moment: Google checks the session is still open and
-     counts this plan. A closed session stops here. */
-  var go=document.getElementById('fgo'), was=go.textContent;
+  /* Once the form has opened, report generation is entirely local.
+     Recording the report must never hold up its display. */
   if(!SESSION){ gate('closed'); return false; }
-  go.disabled=true; go.textContent='Checking\u2026';
-  var attempt=reportAttempt();
-  sessionTry(attempt).then(function(d){
-    go.disabled=false; go.textContent=was;
-    if(!d || !d.ok){
-      if(d && d.error==='closed'){ SESSION=null; gate('closed'); return; }
-      throw new Error('Submission not accepted: '+(d && d.error || 'empty response'));
-    }
+  var go=document.getElementById('fgo'), was=go.textContent;
+  go.disabled=true;
+  var attempt;
+  try {
+    attempt=reportAttempt();
     LAST_REPORT_ID=attempt.rid;
-    try { renderPlan(); } catch(err) {
-      console.error('Report display failed',err);
-      document.getElementById('needTitle').textContent='Report display problem';
-      document.getElementById('needMsg').textContent='Your submission was accepted, but the report could not be displayed. Please tell the presenter.';
-      document.getElementById('needModal').classList.add('on');
-    }
-  }).catch(function(err){
-    console.error('Report submission failed',err);
-    go.disabled=false; go.textContent=was;
-    document.getElementById('needTitle').textContent='No connection';
-    document.getElementById('needMsg').innerHTML='We could not reach the server. Check your internet and press <b>Show me my plan</b> again. On office Wi-Fi? Try mobile data.';
+    renderPlan();
+  } catch(err) {
+    console.error('Report display failed',err);
+    document.getElementById('needTitle').textContent='Report display problem';
+    document.getElementById('needMsg').textContent='Your answers are still here. Please try again or tell the presenter.';
     document.getElementById('needModal').classList.add('on');
-  });
+    go.disabled=false;go.textContent=was;
+    return false;
+  }
+  go.disabled=false;go.textContent=was;
+  queueReport(attempt);
   return false;
 }
 function renderPlan(){
@@ -2808,6 +2802,60 @@ function reportAttempt(){
   try{localStorage.setItem('jugnu.pending.report',JSON.stringify(saved));}catch(e){}
   // Financial answers stay on this device; only the random IDs are sent.
   return {act:saved.act,sid:saved.sid,dev:saved.dev,rid:saved.rid};
+}
+/* Pending records contain random IDs only; financial answers stay local.
+   A single worker sends records in the background and retries with pauses. */
+var REPORT_QUEUE_KEY='jugnu.pending.reports', REPORT_QUEUE={}, REPORT_SENDING=false, REPORT_TIMER=null, REPORT_BACKOFF=0;
+function readReportQueue(){
+  try {
+    var saved=JSON.parse(localStorage.getItem(REPORT_QUEUE_KEY)||'{}');
+    Object.keys(saved).forEach(function(k){
+      var p=saved[k];
+      if(p && p.act==='report' && p.sid && p.dev && p.rid)REPORT_QUEUE[k]=p;
+    });
+  } catch(e){}
+  return REPORT_QUEUE;
+}
+function saveReportQueue(){
+  try{localStorage.setItem(REPORT_QUEUE_KEY,JSON.stringify(REPORT_QUEUE));}catch(e){}
+}
+function queueReport(p){
+  readReportQueue();
+  REPORT_QUEUE[p.sid+':'+p.rid]={act:'report',sid:p.sid,dev:p.dev,rid:p.rid};
+  saveReportQueue();
+  scheduleReportSync(0);
+}
+function scheduleReportSync(delay){
+  if(REPORT_SENDING || REPORT_TIMER!==null)return;
+  REPORT_TIMER=setTimeout(function(){REPORT_TIMER=null;syncReports();},delay);
+}
+function retrySavedReports(){
+  readReportQueue();
+  if(REPORT_TIMER!==null){clearTimeout(REPORT_TIMER);REPORT_TIMER=null;}
+  scheduleReportSync(0);
+}
+function syncReports(){
+  if(REPORT_SENDING || (window.navigator && window.navigator.onLine===false))return;
+  readReportQueue();
+  var key=Object.keys(REPORT_QUEUE)[0];
+  if(!key){REPORT_BACKOFF=0;return;}
+  REPORT_SENDING=true;
+  sessionTry(REPORT_QUEUE[key],2).then(function(d){
+    if(!d || !d.ok){
+      if(d && (d.error==='closed' || d.error==='expired' || d.error==='invalid')){
+        console.warn('Report is displayed, but its workshop record was declined: '+d.error);
+      } else throw new Error('Report recording not confirmed');
+    }
+    // A declined record must not retry forever or block other queued records.
+    readReportQueue();delete REPORT_QUEUE[key];saveReportQueue();
+    REPORT_SENDING=false;REPORT_BACKOFF=0;
+    scheduleReportSync(1500+Math.random()*3500);
+  }).catch(function(err){
+    console.warn('Report recording will retry in the background',err);
+    REPORT_SENDING=false;
+    REPORT_BACKOFF=Math.min(120000,REPORT_BACKOFF?REPORT_BACKOFF*2:15000);
+    scheduleReportSync(REPORT_BACKOFF+Math.random()*15000);
+  });
 }
 /* a one-off number for each plan or rating, so a retry is never counted twice */
 function newId(k){ return k+Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
@@ -3070,7 +3118,9 @@ function startFresh(){
 
   /* presenter screen at #present; everyone else waits for an open session */
   window.addEventListener('online',retrySavedFeedback);
+  window.addEventListener('online',retrySavedReports);
   retrySavedFeedback();
+  retrySavedReports();
  } catch(e){console.error('Page setup failed',e);gate('offline');return;}
   if(location.hash==='#present') presenterStart(); else audienceStart();
   window.addEventListener('hashchange',function(){ location.reload(); });
