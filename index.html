@@ -1146,7 +1146,8 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
     <div id="thanksStep" class="hide">
       <div class="tick">&#10003;</div>
       <h3>Thank you.</h3>
-      <p class="ms">Choose “Save as PDF” in the print window to save your plan.</p>
+      <p class="ms">You can save this report again, including any changes made before the workshop expiry.</p>
+      <button type="button" class="btn pdf full" onclick="saveExistingPdf()">Save as PDF</button>
       <p class="fbline sending" id="fbLine"></p>
       <p class="tx" id="thxLine">For more on financial planning, connect with the planner on LinkedIn.</p>
       <a class="btn lin" id="thxLi" href="https://www.linkedin.com/in/khushbuchoudhary" target="_blank" rel="noopener">Connect on LinkedIn</a>
@@ -1173,7 +1174,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
   <div class="sheet2">
     <h3 id="needTitle">Almost there</h3>
     <div class="ms" id="needMsg">Fill in the boxes <b>marked in red</b>.</div>
-    <button class="goback" onclick="closeNeed()">Show me</button>
+    <button class="goback" id="needDismiss" onclick="closeNeed()">Show me</button>
   </div>
 </div>
 <script>
@@ -2608,6 +2609,7 @@ function checkForm(only){
 /* Say only what is actually wrong. Reciting all three rules every time sent people
    hunting for a missing goal when the real problem was one empty box. */
 function showNeed(miss){
+  document.getElementById('needDismiss').hidden=false;
   miss = miss || [];
   var has=function(k){ return miss.indexOf(k)>=0; };
   var lines=[];
@@ -2634,6 +2636,7 @@ function showNeed(miss){
   document.getElementById('needModal').classList.add('on');
 }
 function closeNeed(){
+  document.getElementById('needDismiss').hidden=false;
   document.getElementById('needModal').classList.remove('on');
   var el=document.querySelector('.bad');
   if(el){ el.scrollIntoView({behavior:'smooth',block:'center'});
@@ -2652,6 +2655,7 @@ function markReportGenerated(){
 }
 function showExistingReport(){
   if(!PLAN)return;
+  document.getElementById('needDismiss').hidden=false;
   document.getElementById('needModal').classList.remove('on');
   document.getElementById('formView').classList.add('hide');
   document.getElementById('reportView').classList.remove('hide');
@@ -2660,6 +2664,7 @@ function showExistingReport(){
 }
 function blockExpiredRegeneration(){
   if(!SESSION || !SESSION.expiresAt || Date.now()<SESSION.expiresAt || !hasGeneratedReport())return false;
+  document.getElementById('needDismiss').hidden=!!PLAN;
   document.getElementById('needTitle').textContent='This workshop has ended';
   document.getElementById('needMsg').innerHTML=PLAN
     ? 'You can still save your existing report. New reports cannot be generated after the workshop expiry.'+
@@ -2759,6 +2764,11 @@ function finishAndPrint(){
   var btn=document.getElementById('saveBtn');btn.disabled=false;btn.textContent='Save as PDF';
   PRINT_PENDING=true;
   setTimeout(function(){PRINT_PENDING=false;window.print();},220);
+}
+function saveExistingPdf(){
+  if(!PLAN || !RATING || PRINT_PENDING)return;
+  PRINT_PENDING=true;
+  try{window.print();}finally{PRINT_PENDING=false;}
 }
 function closeThanks(){document.getElementById('rateModal').classList.remove('on');}
 var LAST_FB=null, FEEDBACK_QUEUE={}, FB_TIMER=null, FB_BACKOFF=0;
