@@ -2835,11 +2835,11 @@ function reportAttempt(){
   var fingerprint=JSON.stringify(snapshot()),saved=REPORT_ATTEMPT;
   try{saved=JSON.parse(localStorage.getItem('jugnu.pending.report')||'null')||saved;}catch(e){}
   if(!saved || saved.sid!==SESSION.sid || saved.fingerprint!==fingerprint)
-    saved={act:'report',sid:SESSION.sid,dev:deviceId(),rid:newId('r'),fingerprint:fingerprint};
+    saved={act:'report',sid:SESSION.sid,dev:deviceId(),rid:newId('r'),fingerprint:fingerprint,mode:SESSION.mode||'',joinedAt:SESSION.joinedAt||0};
   REPORT_ATTEMPT=saved;
   try{localStorage.setItem('jugnu.pending.report',JSON.stringify(saved));}catch(e){}
   // Financial answers stay on this device; only the random IDs are sent.
-  return {act:saved.act,sid:saved.sid,dev:saved.dev,rid:saved.rid};
+  return {act:saved.act,sid:saved.sid,dev:saved.dev,rid:saved.rid,mode:saved.mode||'',joinedAt:saved.joinedAt||0};
 }
 /* Pending records contain random IDs only; financial answers stay local.
    A single worker sends records in the background and retries with pauses. */
@@ -2859,7 +2859,7 @@ function saveReportQueue(){
 }
 function queueReport(p){
   readReportQueue();
-  REPORT_QUEUE[p.sid+':'+p.rid]={act:'report',sid:p.sid,dev:p.dev,rid:p.rid};
+  REPORT_QUEUE[p.sid+':'+p.rid]={act:'report',sid:p.sid,dev:p.dev,rid:p.rid,mode:p.mode||'',joinedAt:p.joinedAt||0};
   saveReportQueue();
   scheduleReportSync(0);
 }
@@ -2918,12 +2918,34 @@ function gate(kind){
     : kind==='offline'
     ? '<h2>We could not connect</h2><p>Check your internet and try again.<br>On office Wi-Fi? Try mobile data.</p>'+
       '<div class="gbtns"><button class="pv-btn" onclick="audienceStart()">Try again</button></div>'
+    : kind==='expiredlink'
+    ? '<h2>This workshop link has expired</h2><p>Please ask the presenter for a new workshop link.</p>'
+    : kind==='invalidlink'
+    ? '<h2>This workshop link is incomplete</h2><p>Please copy the full link shared by the presenter.</p>'
     : '<h2>This session is closed</h2><p>For a financial plan, contact <b>'+PLANNER+'</b>.</p>'+
       '<div class="gbtns"><a class="btn wa" href="https://wa.me/'+WHATSAPP+'" target="_blank" rel="noopener">WhatsApp '+first+'</a>'+
       '<a class="pv-btn lite" style="text-decoration:none" href="mailto:khushbuchoudhary06@gmail.com">Email '+first+'</a></div>';
   window.scrollTo(0,0);
 }
+function readWorkshopLink(){
+  if(location.hash.indexOf('#workshop=')!==0)return null;
+  try{
+    var p=JSON.parse(decodeURIComponent(location.hash.slice(10)));
+    if(!p || typeof p.sid!=='string' || !/^[A-Za-z0-9_-]{1,60}$/.test(p.sid) ||
+       typeof p.name!=='string' || !p.name.trim() || p.name.length>80 ||
+       !Number.isFinite(p.openedAt) || !Number.isFinite(p.expiresAt) ||
+       p.expiresAt<=p.openedAt || p.expiresAt-p.openedAt>7*86400000) return {invalid:true};
+    return p;
+  }catch(e){return {invalid:true};}
+}
 function audienceStart(){
+  var linked=readWorkshopLink();
+  if(linked){
+    if(linked.invalid){SESSION=null;gate('invalidlink');return;}
+    if(Date.now()>=linked.expiresAt){SESSION=null;gate('expiredlink');return;}
+    SESSION={sid:linked.sid,name:linked.name,mode:'workshop',joinedAt:Date.now()};
+    gate('open');return;
+  }
   gate('checking');
   var hint=setTimeout(function(){var c=document.getElementById('gateCard');
     if(c && c.textContent.indexOf('Opening the form')>=0)c.innerHTML='<div class="spin"></div><p>Waiting for the workshop connection…</p><p>Your answers are safe on this device.</p>';
@@ -2938,8 +2960,16 @@ function audienceStart(){
 
 /* ---- presenter screen ---- */
 function pvTime(ms){ if(!ms) return '\u2014';
-  return new Date(ms).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}); }
+  return new Date(ms).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Kathmandu'}); }
 function audienceLink(){ return location.origin+location.pathname; }
+function workshopLink(d){
+  return audienceLink()+'#workshop='+encodeURIComponent(JSON.stringify({sid:d.sid,name:d.name,openedAt:d.openedAt,expiresAt:d.closesAt}));
+}
+function nepalInput(ms){return new Date(ms+345*60000).toISOString().slice(0,16);}
+function nepalExpiry(value){
+  if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value||''))return NaN;
+  return Date.parse(value+':00+05:45');
+}
 function presenterStart(){
   document.getElementById('formView').classList.add('hide');
   document.getElementById('reportView').classList.add('hide');
@@ -2973,7 +3003,7 @@ function pvLoad(){
 }
 function pvDraw(d){
   clearInterval(PV_TIMER);
-  var b=document.getElementById('pvBody'), link=audienceLink();
+  var b=document.getElementById('pvBody'), link=d.open?workshopLink(d):audienceLink();
   var counts='<div class="pv-count"><div><span>Reports accepted</span><b id="pvR">'+d.reports+'</b></div>'+
              '<div><span>Devices</span><b id="pvD">'+d.devices+'</b></div></div>'+
              '<p class="pv-note" id="pvSync">'+syncMessage(d)+'</p><button class="pv-btn lite" id="pvTransfer">Copy pending entries to Sheet</button>';
@@ -2981,12 +3011,12 @@ function pvDraw(d){
     b.innerHTML='<div class="pv-card"><div class="pv-state on"><i></i>Open</div>'+
       '<div class="pv-facts"><span>Workshop</span><b>'+esc(d.name)+'</b>'+
       '<span>Opened</span><b>'+pvTime(d.openedAt)+'</b>'+
-      '<span>Closes by itself</span><b>'+pvTime(d.closesAt)+'</b></div>'+counts+
-      '<div class="pv-row" style="margin-top:16px"><button class="pv-btn stop" id="pvClose">Close the form</button></div></div>'+
-      '<div class="pv-card"><h2>Share with the room</h2><div class="pv-link"><div id="pvQR"></div>'+
+      '<span>Link expires (Nepal time)</span><b>'+pvTime(d.closesAt)+'</b></div>'+counts+
+      '<div class="pv-row" style="margin-top:16px"><button class="pv-btn stop" id="pvClose">Close session</button></div></div>'+
+      '<div class="pv-card"><h2>Share this workshop link</h2><div class="pv-link"><div id="pvQR"></div>'+
       '<div style="flex:1;min-width:220px"><code>'+esc(link)+'</code>'+
       '<div class="pv-row" style="margin-top:10px"><button class="pv-btn lite" id="pvCopy">Copy link</button></div>'+
-      '<p class="pv-note">Counts refresh every 10 seconds.</p></div></div></div>';
+      '<p class="pv-note">This link opens the form without waiting for Google. Closing the session early does not disable it; its expiry controls new access. Counts refresh every 10 seconds.</p><p class="pv-note">General link for comparison: <a href="'+esc(audienceLink())+'" target="_blank" rel="noopener">Open general link</a></p></div></div></div>';
     document.getElementById('pvClose').onclick=function(){ this.disabled=true;
       sessionTry({act:'close', code:PCODE}).then(pvDraw).catch(function(){ pvLoad(); }); };
     document.getElementById('pvCopy').onclick=function(){ var t=this;
@@ -3009,14 +3039,16 @@ function pvDraw(d){
       '<p class="pv-note" style="margin-top:6px">The form link shows \u201cThis session is closed\u201d until you open it.</p>'+
       '<div style="margin-top:16px"><label for="pvName">Workshop name</label>'+
       '<div class="pv-row"><input id="pvName" maxlength="80" placeholder="e.g. Asian Paints \u2014 Oct 2026">'+
-      '<button class="pv-btn" id="pvOpen">Open the form</button></div><p class="pv-msg hide" id="pvErr"></p></div></div>'+
+      '</div><div style="margin-top:12px"><label for="pvExpiry">Allow new participants until (Nepal time)</label><div class="pv-row"><input type="datetime-local" id="pvExpiry" value="'+nepalInput(Date.now()+3*3600000)+'"><button class="pv-btn" id="pvOpen">Open workshop</button></div></div><p class="pv-note">Choose a time within the next 7 days. People who have already opened the form can finish after this time.</p><p class="pv-msg hide" id="pvErr"></p></div></div>'+
       (d.sid ? '<div class="pv-card"><h2>Last session</h2><div class="pv-facts"><span>Workshop</span><b>'+esc(d.name)+'</b>'+
         '<span>Opened</span><b>'+pvTime(d.openedAt)+'</b></div>'+counts+'</div>' : '');
     document.getElementById('pvOpen').onclick=function(){
       var n=(document.getElementById('pvName').value||'').trim(), e=document.getElementById('pvErr');
       if(!n){ e.textContent='Type the workshop name first.'; e.classList.remove('hide'); return; }
-      this.disabled=true;
-      sessionTry({act:'open', code:PCODE, name:n}).then(pvDraw).catch(function(){ pvLoad(); });
+      var expiry=nepalExpiry(document.getElementById('pvExpiry').value);
+      if(!Number.isFinite(expiry) || expiry<=Date.now() || expiry-Date.now()>7*86400000){e.textContent='Choose a future expiry within 7 days, in Nepal time.';e.classList.remove('hide');return;}
+      var button=this;button.disabled=true;
+      sessionTry({act:'open', code:PCODE, name:n, expiresAt:expiry}).then(function(d){if(!d.ok){button.disabled=false;e.textContent='Workshop could not be opened. Please check your expiry and try again.';e.classList.remove('hide');return;}pvDraw(d);}).catch(function(){ pvLoad(); });
     };
   }
   var transfer=document.getElementById('pvTransfer');if(transfer)transfer.onclick=function(){this.disabled=true;sessionTry({act:'flush',code:PCODE},1).then(pvDraw).catch(function(){transfer.disabled=false;document.getElementById('pvSync').textContent='Transfer could not be confirmed. Please try again.';});};
