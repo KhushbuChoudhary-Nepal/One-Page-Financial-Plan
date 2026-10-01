@@ -2921,30 +2921,59 @@ function gate(kind){
     : kind==='expiredlink'
     ? '<h2>This workshop link has expired</h2><p>Please ask the presenter for a new workshop link.</p>'
     : kind==='invalidlink'
-    ? '<h2>This workshop link is incomplete</h2><p>Please copy the full link shared by the presenter.</p>'
+    ? '<h2>This workshop link is invalid</h2><p>Please use a new signed link copied from the presenter screen.</p>'
+    : kind==='unsupportedlink'
+    ? '<h2>Please use a current browser</h2><p>Open this workshop link in a current version of Chrome, Edge, Safari or Firefox.</p>'
     : '<h2>This session is closed</h2><p>For a financial plan, contact <b>'+PLANNER+'</b>.</p>'+
       '<div class="gbtns"><a class="btn wa" href="https://wa.me/'+WHATSAPP+'" target="_blank" rel="noopener">WhatsApp '+first+'</a>'+
       '<a class="pv-btn lite" style="text-decoration:none" href="mailto:khushbuchoudhary06@gmail.com">Email '+first+'</a></div>';
   window.scrollTo(0,0);
 }
+var WORKSHOP_PUBLIC_KEY="MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAjT2h/hjHscy98D1Q40Jp9gxG6nAJHkko9IY4XVgatI2eUoWPJOzpAeZHhtkwzXs+fvwpO7hL6rfpAGZ0m8YfcYe8ZuZf9fukLK0VMjyKvWRfy69faILbt8Sez0R1Z4pBN1KqTXVuhYuIM11PdLHUwhtOi1XLf1qgX7BMAThOvFIxTlV6cmZNz/sWLXyEkZFAFdaFpht0trCQDBoPKmlwW5PnDjMmzk3NXOJM4SyWYRI6UA0FMp/XwtaWL2FhPbn0ajHDA8f+sndgqYvio2N21zcehsfCiycYxtm6iEx2hFgNJoEmDKzASIHH9IusJFqqZebDS0iSAgw5kIKJNe2aiwIDAQAB";
+var WORKSHOP_VERIFY_KEY=null;
+function fromBase64Url(value){
+  if(!/^[A-Za-z0-9_-]+$/.test(value))throw new Error('Invalid token');
+  var raw=atob(value.replace(/-/g,'+').replace(/_/g,'/'));
+  return Uint8Array.from(raw,function(c){return c.charCodeAt(0);});
+}
 function readWorkshopLink(){
-  if(location.hash.indexOf('#workshop=')!==0)return null;
-  try{
-    var p=JSON.parse(decodeURIComponent(location.hash.slice(10)));
-    if(!p || typeof p.sid!=='string' || !/^[A-Za-z0-9_-]{1,60}$/.test(p.sid) ||
-       typeof p.name!=='string' || !p.name.trim() || p.name.length>80 ||
-       !Number.isFinite(p.openedAt) || !Number.isFinite(p.expiresAt) ||
-       p.expiresAt<=p.openedAt || p.expiresAt-p.openedAt>7*86400000) return {invalid:true};
-    return p;
-  }catch(e){return {invalid:true};}
+  if(location.hash.indexOf('#workshop=')===0)return Promise.resolve({invalid:true});
+  if(location.hash.indexOf('#w=')!==0)return Promise.resolve(null);
+  if(!window.crypto || !window.crypto.subtle)return Promise.resolve({unsupported:true});
+  var parts=location.hash.slice(3).split('.');
+  if(parts.length!==2 || location.hash.length>3000)return Promise.resolve({invalid:true});
+  return Promise.resolve().then(function(){
+    var payload=fromBase64Url(parts[0]),signature=fromBase64Url(parts[1]);
+    if(!WORKSHOP_VERIFY_KEY){
+      var spki=Uint8Array.from(atob(WORKSHOP_PUBLIC_KEY),function(c){return c.charCodeAt(0);});
+      WORKSHOP_VERIFY_KEY=window.crypto.subtle.importKey('spki',spki,{name:'RSASSA-PKCS1-v1_5',hash:'SHA-256'},false,['verify']);
+    }
+    return WORKSHOP_VERIFY_KEY.then(function(key){
+      return window.crypto.subtle.verify('RSASSA-PKCS1-v1_5',key,signature,payload);
+    }).then(function(ok){
+      if(!ok)return {invalid:true};
+      var values=JSON.parse(new TextDecoder().decode(payload));
+      if(!Array.isArray(values) || values.length!==5 || values[0]!==1)return {invalid:true};
+      var p={sid:values[1],name:values[2],openedAt:values[3],expiresAt:values[4]};
+      if(typeof p.sid!=='string' || !/^[A-Za-z0-9_-]{1,60}$/.test(p.sid) ||
+         typeof p.name!=='string' || !p.name.trim() || p.name.length>80 ||
+         !Number.isFinite(p.openedAt) || !Number.isFinite(p.expiresAt) ||
+         p.expiresAt<=p.openedAt || p.expiresAt-p.openedAt>7*86400000)return {invalid:true};
+      return p;
+    });
+  }).catch(function(){return {invalid:true};});
 }
 function audienceStart(){
-  var linked=readWorkshopLink();
-  if(linked){
-    if(linked.invalid){SESSION=null;gate('invalidlink');return;}
-    if(Date.now()>=linked.expiresAt){SESSION=null;gate('expiredlink');return;}
-    SESSION={sid:linked.sid,name:linked.name,mode:'workshop',joinedAt:Date.now()};
-    gate('open');return;
+  if(location.hash.indexOf('#w=')===0 || location.hash.indexOf('#workshop=')===0){
+    gate('checking');
+    readWorkshopLink().then(function(linked){
+      if(!linked || linked.invalid){SESSION=null;gate('invalidlink');return;}
+      if(linked.unsupported){SESSION=null;gate('unsupportedlink');return;}
+      if(Date.now()>=linked.expiresAt){SESSION=null;gate('expiredlink');return;}
+      SESSION={sid:linked.sid,name:linked.name,mode:'workshop',joinedAt:Date.now()};
+      gate('open');
+    });
+    return;
   }
   gate('checking');
   var hint=setTimeout(function(){var c=document.getElementById('gateCard');
@@ -2963,7 +2992,24 @@ function pvTime(ms){ if(!ms) return '\u2014';
   return new Date(ms).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Kathmandu'}); }
 function audienceLink(){ return location.origin+location.pathname; }
 function workshopLink(d){
-  return audienceLink()+'#workshop='+encodeURIComponent(JSON.stringify({sid:d.sid,name:d.name,openedAt:d.openedAt,expiresAt:d.closesAt}));
+  return d.linkToken?audienceLink()+'#w='+d.linkToken:'';
+}
+function invitationLabel(d){return 'One Page Financial Plan - '+d.name;}
+function copyWorkshopInvitation(d,link,button){
+  var label=invitationLabel(d),html='<a href="'+esc(link)+'">'+esc(label)+'</a>';
+  var plain=label+'\n'+link;
+  function copied(){button.textContent='Invitation copied';}
+  function fallback(){
+    if(navigator.clipboard && navigator.clipboard.writeText)return navigator.clipboard.writeText(plain).then(function(){button.textContent='Copied title and link';});
+    window.prompt('Copy this invitation:',plain);
+    return Promise.resolve();
+  }
+  try{
+    if(window.ClipboardItem && navigator.clipboard && navigator.clipboard.write){
+      return navigator.clipboard.write([new ClipboardItem({'text/html':new Blob([html],{type:'text/html'}),'text/plain':new Blob([plain],{type:'text/plain'})})]).then(copied).catch(fallback);
+    }
+    return fallback();
+  }catch(e){return fallback();}
 }
 function nepalInput(ms){return new Date(ms+345*60000).toISOString().slice(0,16);}
 function nepalExpiry(value){
@@ -3007,6 +3053,7 @@ function pvDraw(d){
   var counts='<div class="pv-count"><div><span>Reports accepted</span><b id="pvR">'+d.reports+'</b></div>'+
              '<div><span>Devices</span><b id="pvD">'+d.devices+'</b></div></div>'+
              '<p class="pv-note" id="pvSync">'+syncMessage(d)+'</p><button class="pv-btn lite" id="pvTransfer">Copy pending entries to Sheet</button>';
+  if(d.open && !link){b.innerHTML='<div class="pv-card"><h2>Update the Apps Script first</h2><p>The presenter needs the new script deployment to create a signed workshop link.</p></div>';return;}
   if(d.open){
     b.innerHTML='<div class="pv-card"><div class="pv-state on"><i></i>Open</div>'+
       '<div class="pv-facts"><span>Workshop</span><b>'+esc(d.name)+'</b>'+
@@ -3014,13 +3061,14 @@ function pvDraw(d){
       '<span>Link expires (Nepal time)</span><b>'+pvTime(d.closesAt)+'</b></div>'+counts+
       '<div class="pv-row" style="margin-top:16px"><button class="pv-btn stop" id="pvClose">Close session</button></div></div>'+
       '<div class="pv-card"><h2>Share this workshop link</h2><div class="pv-link"><div id="pvQR"></div>'+
-      '<div style="flex:1;min-width:220px"><code>'+esc(link)+'</code>'+
-      '<div class="pv-row" style="margin-top:10px"><button class="pv-btn lite" id="pvCopy">Copy link</button></div>'+
+      '<div style="flex:1;min-width:220px"><p><a href="'+esc(link)+'" target="_blank" rel="noopener">'+esc(invitationLabel(d))+'</a></p><details><summary>Show full link</summary><code>'+esc(link)+'</code></details>'+ 
+      '<div class="pv-row" style="margin-top:10px"><button class="pv-btn" id="pvInvitation">Copy invitation</button><button class="pv-btn lite" id="pvCopy">Copy direct link</button></div>'+
       '<p class="pv-note">This link opens the form without waiting for Google. Closing the session early does not disable it; its expiry controls new access. Counts refresh every 10 seconds.</p><p class="pv-note">General link for comparison: <a href="'+esc(audienceLink())+'" target="_blank" rel="noopener">Open general link</a></p></div></div></div>';
     document.getElementById('pvClose').onclick=function(){ this.disabled=true;
       sessionTry({act:'close', code:PCODE}).then(pvDraw).catch(function(){ pvLoad(); }); };
     document.getElementById('pvCopy').onclick=function(){ var t=this;
       try{ navigator.clipboard.writeText(link).then(function(){ t.textContent='Copied'; }); }catch(e){} };
+    document.getElementById('pvInvitation').onclick=function(){copyWorkshopInvitation(d,link,this).catch(function(){window.prompt('Copy the workshop link:',link);});};
     pvQR(link);
     var polling=false;
     PV_TIMER=setInterval(function(){
