@@ -2639,7 +2639,37 @@ function closeNeed(){
   if(el){ el.scrollIntoView({behavior:'smooth',block:'center'});
     if(el.tagName==='INPUT') setTimeout(function(){el.focus();},400); }
 }
+var GENERATED_SESSIONS={};
+function hasGeneratedReport(){
+  if(!SESSION)return false;
+  if(GENERATED_SESSIONS[SESSION.sid])return true;
+  try{return localStorage.getItem('jugnu.report.generated:'+SESSION.sid)==='1';}catch(e){return false;}
+}
+function markReportGenerated(){
+  if(!SESSION)return;
+  GENERATED_SESSIONS[SESSION.sid]=true;
+  try{localStorage.setItem('jugnu.report.generated:'+SESSION.sid,'1');}catch(e){}
+}
+function showExistingReport(){
+  if(!PLAN)return;
+  document.getElementById('needModal').classList.remove('on');
+  document.getElementById('formView').classList.add('hide');
+  document.getElementById('reportView').classList.remove('hide');
+  document.title='Jugnu - One Page Plan - '+(PLAN.name||'Client');
+  window.scrollTo(0,0);
+}
+function blockExpiredRegeneration(){
+  if(!SESSION || !SESSION.expiresAt || Date.now()<SESSION.expiresAt || !hasGeneratedReport())return false;
+  document.getElementById('needTitle').textContent='This workshop has ended';
+  document.getElementById('needMsg').innerHTML=PLAN
+    ? 'You can still save your existing report. New reports cannot be generated after the workshop expiry.'+
+      '<div style="margin-top:14px"><button type="button" class="pv-btn" onclick="showExistingReport()">Return to my report</button></div>'
+    : 'You have already generated a report for this workshop. Please use your saved PDF or ask the presenter for a new workshop link.';
+  document.getElementById('needModal').classList.add('on');
+  return true;
+}
 function submitForm(){
+  if(blockExpiredRegeneration())return false;
   clearBad();
   var chk=checkForm();
   if(chk.miss.length){
@@ -2663,6 +2693,7 @@ function submitForm(){
     attempt=reportAttempt();
     LAST_REPORT_ID=attempt.rid;
     renderPlan();
+    markReportGenerated();
   } catch(err) {
     console.error('Report display failed',err);
     document.getElementById('needTitle').textContent='Report display problem';
@@ -2970,7 +3001,7 @@ function audienceStart(){
       if(!linked || linked.invalid){SESSION=null;gate('invalidlink');return;}
       if(linked.unsupported){SESSION=null;gate('unsupportedlink');return;}
       if(Date.now()>=linked.expiresAt){SESSION=null;gate('expiredlink');return;}
-      SESSION={sid:linked.sid,name:linked.name,mode:'workshop',joinedAt:Date.now()};
+      SESSION={sid:linked.sid,name:linked.name,mode:'workshop',joinedAt:Date.now(),expiresAt:linked.expiresAt};
       gate('open');
     });
     return;
@@ -2982,7 +3013,7 @@ function audienceStart(){
   sessionTry({act:'status'},1).then(function(st){
     clearTimeout(hint);
     if(!st || !st.ok)throw new Error('Invalid session response');
-    if(st.open){SESSION={sid:st.sid,name:st.name};gate('open');}
+    if(st.open){SESSION={sid:st.sid,name:st.name,expiresAt:st.closesAt};gate('open');}
     else{SESSION=null;gate('closed');}
   }).catch(function(){clearTimeout(hint);gate('offline');});
 }
