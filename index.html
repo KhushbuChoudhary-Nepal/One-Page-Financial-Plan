@@ -2989,7 +2989,12 @@ function audienceStart(){
 
 /* ---- presenter screen ---- */
 function pvTime(ms){ if(!ms) return '\u2014';
-  return new Date(ms).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'Asia/Kathmandu'}); }
+  return new Date(ms).toLocaleString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:true,timeZone:'Asia/Kathmandu'}).replace(/\b(am|pm)\b/g,function(v){return v.toUpperCase();}); }
+function sessionClosedTime(d){
+  if(d.closedAt && (!d.closesAt || d.closedAt<d.closesAt))return pvTime(d.closedAt)+' (manual)';
+  if(!d.open && d.closesAt && Date.now()>=d.closesAt)return pvTime(d.closesAt)+' (expired)';
+  return 'Time not recorded';
+}
 function audienceLink(){ return location.origin+location.pathname; }
 function workshopLink(d){
   return d.linkToken?audienceLink()+'#w='+d.linkToken:'';
@@ -3057,7 +3062,7 @@ function pvDraw(d){
   if(d.open){
     b.innerHTML='<div class="pv-card"><div class="pv-state on"><i></i>Open</div>'+
       '<div class="pv-facts"><span>Workshop</span><b>'+esc(d.name)+'</b>'+
-      '<span>Opened</span><b>'+pvTime(d.openedAt)+'</b>'+
+      '<span>Opened (Nepal time)</span><b>'+pvTime(d.openedAt)+'</b>'+
       '<span>Link expires (Nepal time)</span><b>'+pvTime(d.closesAt)+'</b></div>'+counts+
       '<div class="pv-row" style="margin-top:16px"><button class="pv-btn stop" id="pvClose">Close session</button></div></div>'+
       '<div class="pv-card"><h2>Share this workshop link</h2><div class="pv-link"><div id="pvQR"></div>'+
@@ -3089,7 +3094,10 @@ function pvDraw(d){
       '<div class="pv-row"><input id="pvName" maxlength="80" placeholder="e.g. Asian Paints \u2014 Oct 2026">'+
       '</div><div style="margin-top:12px"><label for="pvExpiry">Allow new participants until (Nepal time)</label><div class="pv-row"><input type="datetime-local" id="pvExpiry" value="'+nepalInput(Date.now()+3*3600000)+'"><button class="pv-btn" id="pvOpen">Open workshop</button></div></div><p class="pv-note">Choose a time within the next 7 days. People who have already opened the form can finish after this time.</p><p class="pv-msg hide" id="pvErr"></p></div></div>'+
       (d.sid ? '<div class="pv-card"><h2>Last session</h2><div class="pv-facts"><span>Workshop</span><b>'+esc(d.name)+'</b>'+
-        '<span>Opened</span><b>'+pvTime(d.openedAt)+'</b></div>'+counts+'</div>' : '');
+        '<span>Opened (Nepal time)</span><b>'+pvTime(d.openedAt)+'</b>'+
+        '<span>Link expires (Nepal time)</span><b>'+pvTime(d.closesAt)+'</b>'+
+        '<span>General-link access ended</span><b>'+sessionClosedTime(d)+'</b>'+
+        '<span>Close session pressed</span><b>'+(d.closedAt?pvTime(d.closedAt):'Not recorded')+'</b></div>'+counts+'</div>' : '');
     document.getElementById('pvOpen').onclick=function(){
       var n=(document.getElementById('pvName').value||'').trim(), e=document.getElementById('pvErr');
       if(!n){ e.textContent='Type the workshop name first.'; e.classList.remove('hide'); return; }
