@@ -1040,27 +1040,12 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
     <section class="fcard">
       <div class="fnum">2</div>
       <div class="fbody">
-        <h2>Your cashflow each month</h2>
-        <div class="frow">
-          <label class="ff"><span>How much do you earn every month? <em>(Net cash in hand)</em></span>
-            <div class="mrow"><div class="money"><span class="cur">NPR</span><input id="f_income" type="number" inputmode="numeric" min="0"></div></div></label>
-          <label class="ff"><span>Any other income? <em>(rental income, side hustle etc.)</em></span>
-            <div class="mrow"><div class="money"><span class="cur">NPR</span><input id="f_otherinc" type="number" inputmode="numeric" min="0"></div></div></label>
-        </div>
-        <div class="frow">
-          <label class="ff"><span>How much do you spend every month? <em id="spendHint">(Rent, Groceries, Utility bills, Entertainment)</em></span>
-            <div class="mrow"><div class="money"><span class="cur">NPR</span><input id="f_spend" type="number" inputmode="numeric" min="0"></div></div></label>
-          <label class="ff"><span>Loan EMI each month <em>(if any)</em></span>
-            <div class="mrow"><div class="money"><span class="cur">NPR</span><input id="f_emi" type="number" inputmode="numeric" min="0"></div></div></label>
-        </div>
-        <div class="ff">
-          <span>Do you invest regularly?</span>
-          <div class="seg narrow" id="s_invests">
-            <button type="button" data-v="yes">Yes</button>
-            <button type="button" data-v="no" class="on">No</button>
-          </div>
-        </div>
-        <div class="saveline" id="saveLine"></div>
+        <h2>What you want to achieve<span class="ghcount" id="goalCount"></span></h2>
+        <p class="fsub">Fill in what applies to you &mdash; an estimated cost and when you want it.</p>
+        <div class="ghead2 gcols"><span></span><span>Goal</span><span>Estimated cost (NPR)</span><span>By when</span><span>Duration</span><span></span></div>
+        <div id="goalList"></div>
+        <div id="ownList"></div>
+        <button type="button" class="addg" id="addOwn">+ Add another goal</button>
         <button type="button" class="fcont hide" data-step="2">Continue</button>
       </div>
     </section>
@@ -1109,12 +1094,27 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
     <section class="fcard">
       <div class="fnum">4</div>
       <div class="fbody">
-        <h2>What you want to achieve<span class="ghcount" id="goalCount"></span></h2>
-        <p class="fsub">Fill in what applies to you &mdash; an estimated cost and when you want it.</p>
-        <div class="ghead2 gcols"><span></span><span>Goal</span><span>Estimated cost (NPR)</span><span>By when</span><span>Duration</span><span></span></div>
-        <div id="goalList"></div>
-        <div id="ownList"></div>
-        <button type="button" class="addg" id="addOwn">+ Add another goal</button>
+        <h2>Your cashflow each month</h2>
+        <div class="frow">
+          <label class="ff"><span>How much do you earn every month? <em>(Net cash in hand)</em></span>
+            <div class="mrow"><div class="money"><span class="cur">NPR</span><input id="f_income" type="number" inputmode="numeric" min="0"></div></div></label>
+          <label class="ff"><span>Any other income? <em>(rental income, side hustle etc.)</em></span>
+            <div class="mrow"><div class="money"><span class="cur">NPR</span><input id="f_otherinc" type="number" inputmode="numeric" min="0"></div></div></label>
+        </div>
+        <div class="frow">
+          <label class="ff"><span>How much do you spend every month? <em id="spendHint">(Rent, Groceries, Utility bills, Entertainment)</em></span>
+            <div class="mrow"><div class="money"><span class="cur">NPR</span><input id="f_spend" type="number" inputmode="numeric" min="0"></div></div></label>
+          <label class="ff"><span>Loan EMI each month <em>(if any)</em></span>
+            <div class="mrow"><div class="money"><span class="cur">NPR</span><input id="f_emi" type="number" inputmode="numeric" min="0"></div></div></label>
+        </div>
+        <div class="ff">
+          <span>Do you invest regularly?</span>
+          <div class="seg narrow" id="s_invests">
+            <button type="button" data-v="yes">Yes</button>
+            <button type="button" data-v="no" class="on">No</button>
+          </div>
+        </div>
+        <div class="saveline" id="saveLine"></div>
       </div>
     </section>
 
@@ -2334,7 +2334,7 @@ function setCurrency(){
 /* ── one section at a time on phones and tablets ── */
 var STEPPED=false, STEP=1;
 var REVEAL=1;          /* computers: how many sections are open */
-var STEP_NAMES=['About you','Your cashflow','What you have','What you want'];
+var STEP_NAMES=['About you','What you want to achieve','How much do you have?','Your cashflow each month'];
 function stepQuery(){ return window.matchMedia('(max-width:1024px)').matches; }
 
 function cards(){ return [].slice.call(document.querySelectorAll('#formView .fcard')); }
@@ -2376,8 +2376,8 @@ function nextStep(){
     return;
   }
   if(STEP===1 && needsExpConfirm()){ askExp(nextStep); return; }
-  if(STEP===2 && needsSpendConfirm()){ askSpend(nextStep); return; }
-  if(STEP===3 && needsLoanEmi()){ askLoanEmi(nextStep); return; }
+  if(STEP===4 && needsSpendConfirm()){ askSpend(nextStep); return; }
+  if(STEP===4 && needsLoanEmi()){ askLoanEmi(nextStep); return; }
   goStep(STEP+1);
 }
 /* computers: check this section, then open the next one */
@@ -2395,7 +2395,7 @@ function expStart(){
   var a=+(document.getElementById('f_age').value||0), x=+(document.getElementById('f_exp').value||0);
   return a-x;
 }
-/* spending above income is asked once, when section 2 is finished */
+/* spending above income is asked once, when section 4 is finished */
 var SPEND_OK='';
 function spendKey(){ return [val('f_income'),val('f_otherinc'),val('f_spend'),val('f_emi')].join('|'); }
 function needsSpendConfirm(){
@@ -2438,7 +2438,7 @@ function expYes(){
   if(document.getElementById('expModal').dataset.kind==='loan'){      /* Yes — go and fill the EMI */
     EXP_THEN=null;
     document.getElementById('expModal').classList.remove('on');
-    if(STEPPED && STEP!==2) goStep(2);
+    if(STEPPED && STEP!==4) goStep(4);
     var em=document.getElementById('f_emi');
     setTimeout(function(){ em.scrollIntoView({behavior:'smooth',block:'center'}); },60);
     setTimeout(function(){ em.focus(); markBad(em); },420);
@@ -2462,7 +2462,7 @@ function expChange(){
   EXP_THEN=null;
   document.getElementById('expModal').classList.remove('on');
   if(document.getElementById('expModal').dataset.kind==='spend'){
-    if(STEPPED && STEP!==2) goStep(2);
+    if(STEPPED && STEP!==4) goStep(4);
     var sp=document.getElementById('f_spend');
     sp.scrollIntoView({behavior:'smooth',block:'center'}); setTimeout(function(){ sp.focus(); sp.select(); },350);
     return;
@@ -2483,8 +2483,8 @@ function contStep(n){
     return;
   }
   if(n===1 && needsExpConfirm()){ askExp(function(){ contStep(1); }); return; }
-  if(n===2 && needsSpendConfirm()){ askSpend(function(){ contStep(2); }); return; }
-  if(n===3 && needsLoanEmi()){ askLoanEmi(function(){ contStep(3); }); return; }
+  if(n===4 && needsSpendConfirm()){ askSpend(function(){ contStep(4); }); return; }
+  if(n===4 && needsLoanEmi()){ askLoanEmi(function(){ contStep(4); }); return; }
   REVEAL=Math.max(REVEAL,n+1); STEP=Math.max(STEP,n+1);
   paintStep();
   var next=cards()[n];
@@ -2538,6 +2538,8 @@ function markBad(el){
     el.addEventListener('input',function(){el.classList.remove('bad');},{once:true});
 }
 function checkForm(only){
+  /* Keep the existing checks attached to their reordered form sections. */
+  if(only) only=[0,1,4,3,2][only];
   var miss=[], firstEl=null;
   function need(id,cond){
     var el=document.getElementById(id);
